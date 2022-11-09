@@ -48,12 +48,12 @@ SOAP_PARAMETER = '<ns1:%(name)s xsi:type="%(type)s"%(arrayType)s>%(value)s</ns1:
 STANDARD_INTERFACE = {'url':'services/SoapService51', 'namespace':'http://soap.remoting.web.tle.com'}
 
 HTTP_HEADERS = {
-'Content-type': 'text/xml',
-'SOAPAction': '',
-'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.6) Gecko/2009011913 Firefox/3.0.6',
-'Accept-Language':'en-us,en;q=0.5',
-'Accept-Charset':'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
-'Keep-Alive':'300'
+    'Content-type': 'text/xml',
+    'SOAPAction': '',
+    'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'User-Agent':'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.0.6) Gecko/2009011913 Firefox/3.0.6',
+    'Accept-Language':'en-us,en;q=0.5',
+    'Accept-Charset':'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
+    'Keep-Alive':'300'
 }
 
 SOAP_ENDPOINT_V1 = 'services/SoapInterfaceV1'
@@ -133,11 +133,11 @@ def generate_soap_envelope (name, params, ns, token=None):
         'ns': ns,
         'method': name,
         'params': '' if len(params) == 0 else ''.join([SOAP_PARAMETER % {
-                'name': 'in' + str(i),
-                'type': t(v[2], v[1]),
-                'value': p(v[2]),
-                'arrayType': arrayType(v[2], v[1])
-            } for i, v in enumerate(params)]),
+            'name': 'in' + str(i),
+            'type': t(v[2], v[1]),
+            'value': p(v[2]),
+            'arrayType': arrayType(v[2], v[1])
+        } for i, v in enumerate(params)]),
         'header': '' if token == None or len(token) == 0 else SOAP_HEADER_TOKEN % {'token': token}
     }
 
@@ -151,13 +151,13 @@ def generateToken(username, sharedSecretId, sharedSecretValue):
         id2 += ':'
 
     return '%s:%s%s:%s' % (
-            urlEncode(username),
-            id2,
-            seed,
-            binascii.b2a_base64(hashlib.md5(
-                username + sharedSecretId + seed + sharedSecretValue
-            ).digest())
-        )
+        urlEncode(username),
+        id2,
+        seed,
+        binascii.b2a_base64(hashlib.md5(
+            username + sharedSecretId + seed + sharedSecretValue
+        ).digest())
+    )
 
 # Class designed to make communicated with TLE very easy!
 class TLEClient:
@@ -259,12 +259,7 @@ class TLEClient:
             headers = {}
             cookie = responseInfo.getheader('set-cookie')
             if cookie is not None:
-                for cookie_part in cookie.split(','):
-                    for cookie_name in cookie_part.split(','):
-                        if not cookie_name.upper().split("=")[0].strip() in ["PATH", "DOMAIN", "EXPIRES", "SECURE",
-                                                                             "HTTPONLY"]:
-                            # save cookie
-                            self._cookieJar.append(cookie_name)
+                self._cookieJar = cookie.split(',')
 
             if self.owner.networkLogging:
                 self.owner.echo("HTTP RESPONSE:\n")
@@ -306,8 +301,8 @@ class TLEClient:
 
             raise Exception, errorString
 
-##        except urllib2.URLError, e:
-##            raise Exception, str(e.args[0][1])
+        ##        except urllib2.URLError, e:
+        ##            raise Exception, str(e.args[0][1])
 
         except:
             if self.owner.networkLogging:
@@ -368,24 +363,24 @@ class TLEClient:
 
     def _createSoapSessionFromToken (self, token):
         result = self._call ('loginWithToken', (
-                ('token', 'xsd:string', token),
-            ))
+            ('token', 'xsd:string', token),
+        ))
         return value_as_string (result)
 
     def _createSoapSession (self, username, password):
         result = self._call ('login', (
-                ('username', 'xsd:string', username),
-                ('password', 'xsd:string', password),
-            ))
+            ('username', 'xsd:string', username),
+            ('password', 'xsd:string', password),
+        ))
         return value_as_string (result)
 
     def logout (self):
         self._call ('logout', (
-            ))
+        ))
 
     def getFile(self, url, filepath):
         headers = {}
-##        headers.update(HTTP_HEADERS)
+        ##        headers.update(HTTP_HEADERS)
         headers.update(HTTP_HEADERS)
         if len(self._cookieJar) > 0:
             headers['Cookie'] = "; ".join(self._cookieJar)
@@ -413,8 +408,8 @@ class TLEClient:
                         retry = False
                         raise Exception, "url/http error: " + str(err.reason)
                 if hasattr(err, 'code'):
-                        retry = False
-                        raise Exception, "url/http error code: " + str(err.code)
+                    retry = False
+                    raise Exception, "url/http error code: " + str(err.code)
             except:
                 err = sys.exc_info()[1]
                 if str(err).find("10054") != -1:
@@ -457,89 +452,89 @@ class TLEClient:
 
     def _unzipFile (self, stagingid, zipfile, outpath):
         self._call ('unzipFile', (
-                ('item_uuid', 'xsd:string', stagingid),
-                ('zipfile', 'xsd:string', zipfile),
-                ('outpath', 'xsd:string', outpath),
-            ), returns=0)
+            ('item_uuid', 'xsd:string', stagingid),
+            ('zipfile', 'xsd:string', zipfile),
+            ('outpath', 'xsd:string', outpath),
+        ), returns=0)
 
     def _enumerateItemDefs (self):
         result = self._call('getContributableCollections', (
-            ))
+        ))
         return dict ([(get_named_child_value (itemdef, 'name'), {'uuid': get_named_child_value (itemdef, 'uuid')}) for itemdef in parseString (value_as_string (result)).getElementsByTagName ('itemdef')])
 
     def _newItem (self, itemdefid):
         result = self._call ('newItem', (
-                ('itemdefid', 'xsd:string', itemdefid),
-            ))
+            ('itemdefid', 'xsd:string', itemdefid),
+        ))
         return parseString (value_as_string (result))
 
     # _newVersionItem() only supported in 4.1 and higher
     def _newVersionItem (self, itemid, itemversion, copyattachments):
         result = self._call ('newVersionItem', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', itemversion),
-                ('copyattachments', 'xsd:boolean', str(copyattachments)),
-            ), 1, SOAP_ENDPOINT_V41)
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', itemversion),
+            ('copyattachments', 'xsd:boolean', str(copyattachments)),
+        ), 1, SOAP_ENDPOINT_V41)
         return parseString (value_as_string (result))
 
     def _startEdit (self, itemid, itemversion, copyattachments):
         result = self._call ('editItem', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-                ('copyattachments', 'xsd:boolean', str (copyattachments)),
-            ))
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+            ('copyattachments', 'xsd:boolean', str (copyattachments)),
+        ))
         return parseString (value_as_string (result))
 
     def _forceUnlock (self, itemid, itemversion):
         result = self._call ('unlock', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-            ), returns=0)
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+        ), returns=0)
         return result
 
     def _stopEdit (self, xml, submit):
         result = self._call ('saveItem', (
-                ('itemXML', 'xsd:string', xml),
-                ('bSubmit', 'xsd:boolean', submit),
-            ))
+            ('itemXML', 'xsd:string', xml),
+            ('bSubmit', 'xsd:boolean', submit),
+        ))
         return result
 
     def _cancelEdit (self, itemid, itemversion):
         result = self._call ('cancelItemEdit', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-            ))
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+        ))
         return result
 
     def _uploadFile (self, stagingid, filename, data, overwrite):
         result = self._call ('uploadFile', (
-                ('item_uuid', 'xsd:string', stagingid),
-                ('filename', 'xsd:string', filename),
-                ('data', 'xsd:string', data),
-                ('overwrite', 'xsd:boolean', overwrite),
-            ))
+            ('item_uuid', 'xsd:string', stagingid),
+            ('filename', 'xsd:string', filename),
+            ('data', 'xsd:string', data),
+            ('overwrite', 'xsd:boolean', overwrite),
+        ))
         return result
 
     def _deleteAttachmentFile (self, stagingid, filename):
         result = self._call ('deleteFile', (
-                ('item_uuid', 'xsd:string', stagingid),
-                ('filename', 'xsd:string', filename),
-            ))
+            ('item_uuid', 'xsd:string', stagingid),
+            ('filename', 'xsd:string', filename),
+        ))
         return result
 
     def _deleteItem (self, itemid, itemversion):
         result = self._call ('deleteItem', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-            ))
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+        ))
         return result
 
     def getItem (self, itemid, itemversion, select=''):
         result = self._call ('getItem', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-                ('select', 'xsd:string', select),
-            ))
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+            ('select', 'xsd:string', select),
+        ))
         return PropBagEx(value_as_string(result))
 
     def getItemFilenames (self, itemUuid, itemVersion, path, system):
@@ -547,11 +542,11 @@ class TLEClient:
         if system:
             paramSystem = 'true'
         result = self._call ('getItemFilenames', (
-                ('itemUuid', 'xsd:string', itemUuid),
-                ('itemVersion', 'xsd:int', str (itemVersion)),
-                ('path', 'xsd:string', path),
-                ('system', 'xsd:boolean', paramSystem),
-            ), 1, SOAP_ENDPOINT_V51)
+            ('itemUuid', 'xsd:string', itemUuid),
+            ('itemVersion', 'xsd:int', str (itemVersion)),
+            ('path', 'xsd:string', path),
+            ('system', 'xsd:boolean', paramSystem),
+        ), 1, SOAP_ENDPOINT_V51)
 
         resultList = []
         for childNode in result.childNodes:
@@ -561,9 +556,9 @@ class TLEClient:
 
     def queryCount (self, itemdefs, where):
         result = self._call ('queryCount', (
-                ('itemdefs', 'xsd:string', itemdefs),
-                ('where', 'xsd:string', where),
-            ))
+            ('itemdefs', 'xsd:string', itemdefs),
+            ('where', 'xsd:string', where),
+        ))
         return int(value_as_string(result))
 
     # Return an itemdef UUID given a human displayable name.
@@ -609,15 +604,15 @@ class TLEClient:
             paramOnlyLive = 'true'
 
         result = self._call ('searchItems', (
-                ('freetext', 'xsd:string', query),
-                ('collectionUuids', 'xsd:string', itemdefs),
-                ('whereClause', 'xsd:string', where),
-                ('onlyLive', 'xsd:boolean', paramOnlyLive),
-                ('orderType', 'xsd:int', str (orderType)),
-                ('reverseOrder', 'xsd:boolean', paramReverseOrder),
-                ('offset', 'xsd:int', str(offset)),
-                ('limit', 'xsd:int', str(limit)),
-            ))
+            ('freetext', 'xsd:string', query),
+            ('collectionUuids', 'xsd:string', itemdefs),
+            ('whereClause', 'xsd:string', where),
+            ('onlyLive', 'xsd:boolean', paramOnlyLive),
+            ('orderType', 'xsd:int', str (orderType)),
+            ('reverseOrder', 'xsd:boolean', paramReverseOrder),
+            ('offset', 'xsd:int', str(offset)),
+            ('limit', 'xsd:int', str(limit)),
+        ))
         return PropBagEx(value_as_string(result))
 
     def searchItemsFast(self, freetext='', collectionUuids=[], whereClause='', onlyLive=True, orderType=0, reverseOrder=False, offset=0, length=50, resultCategories=["basic"]):
@@ -630,24 +625,24 @@ class TLEClient:
             paramOnlyLive = 'true'
 
         result = self._call ('searchItemsFast', (
-                ('freetext', 'xsd:string', freetext),
-                ('collectionUuids', 'xsd:string', collectionUuids),
-                ('whereClause', 'xsd:string', whereClause),
-                ('onlyLive', 'xsd:boolean', paramOnlyLive),
-                ('orderType', 'xsd:int', str (orderType)),
-                ('reverseOrder', 'xsd:boolean', paramReverseOrder),
-                ('offset', 'xsd:int', str(offset)),
-                ('length', 'xsd:int', str(length)),
-                ('resultCategories', 'xsd:string', resultCategories),
-            ))
+            ('freetext', 'xsd:string', freetext),
+            ('collectionUuids', 'xsd:string', collectionUuids),
+            ('whereClause', 'xsd:string', whereClause),
+            ('onlyLive', 'xsd:boolean', paramOnlyLive),
+            ('orderType', 'xsd:int', str (orderType)),
+            ('reverseOrder', 'xsd:boolean', paramReverseOrder),
+            ('offset', 'xsd:int', str(offset)),
+            ('length', 'xsd:int', str(length)),
+            ('resultCategories', 'xsd:string', resultCategories),
+        ))
         return PropBagEx(value_as_string(result))
 
     def setOwner (self, itemid, itemversion, ownerid):
         result = self._call ('setOwner', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-                ('userId', 'xsd:string', ownerid),
-            ), 1, facade = SOAP_ENDPOINT_V51)
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+            ('userId', 'xsd:string', ownerid),
+        ), 1, facade = SOAP_ENDPOINT_V51)
 
     def setOwnerByUsername(self, itemID, version, username, saveNonexistentUsernamesAsIDs = False):
         matchingUsers = self.searchUsersByGroup("", username)
@@ -667,10 +662,10 @@ class TLEClient:
 
     def addSharedOwner (self, itemid, itemversion, ownerid):
         result = self._call ('addSharedOwner', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-                ('userId', 'xsd:string', ownerid),
-            ))
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+            ('userId', 'xsd:string', ownerid),
+        ))
 
     def addSharedOwners (self, itemid, itemversion, collaboratorUsernames, saveNonexistentUsernamesAsIDs = False):
         for username in collaboratorUsernames:
@@ -692,87 +687,87 @@ class TLEClient:
 
     def removeSharedOwner (self, itemid, itemversion, ownerid):
         result = self._call ('removeSharedOwner', (
-                ('itemid', 'xsd:string', itemid),
-                ('version', 'xsd:int', str (itemversion)),
-                ('userId', 'xsd:string', ownerid),
-            ))
+            ('itemid', 'xsd:string', itemid),
+            ('version', 'xsd:int', str (itemversion)),
+            ('userId', 'xsd:string', ownerid),
+        ))
 
 
     def getUser (self, userId):
         result = self._call ('getUser', (
-                ('userId', 'xsd:string', userId),
-            ), 1, facade = SOAP_ENDPOINT_V51)
+            ('userId', 'xsd:string', userId),
+        ), 1, facade = SOAP_ENDPOINT_V51)
         return PropBagEx(value_as_string(result))
 
     def searchUsersByGroup (self, groupUuid, searchString):
         result = self._call ('searchUsersByGroup', (
-                ('groupUuid', 'xsd:string', groupUuid),
-                ('searchString', 'xsd:string', searchString),
-            ), 1, SOAP_ENDPOINT_V51)
+            ('groupUuid', 'xsd:string', groupUuid),
+            ('searchString', 'xsd:string', searchString),
+        ), 1, SOAP_ENDPOINT_V51)
         return PropBagEx(value_as_string(result))
 
     def activateItemAttachments (self, uuid, version, courseCode, attachments):
         self._call ('activateItemAttachments', (
-                ('uuid', 'xsd:string', uuid),
-                ('version', 'xsd:int', version),
-                ('courseCode', 'xsd:string', courseCode),
-                ('attachments', 'xsd:string', attachments),
-            ))
+            ('uuid', 'xsd:string', uuid),
+            ('version', 'xsd:int', version),
+            ('courseCode', 'xsd:string', courseCode),
+            ('attachments', 'xsd:string', attachments),
+        ))
 
     def addUser (self, uuid, username, password, firstname, lastname, email):
         return value_as_string(self._call ('addUser', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('uuid', 'xsd:string', uuid),
-                ('name', 'xsd:string', username),
-                ('password', 'xsd:string', password),
-                ('first', 'xsd:string', firstname),
-                ('last', 'xsd:string', lastname),
-                ('email', 'xsd:string', email),
-            ), facade=SOAP_INTERFACE_V2))
+            ('ssid', 'xsd:string', self.sessionid),
+            ('uuid', 'xsd:string', uuid),
+            ('name', 'xsd:string', username),
+            ('password', 'xsd:string', password),
+            ('first', 'xsd:string', firstname),
+            ('last', 'xsd:string', lastname),
+            ('email', 'xsd:string', email),
+        ), facade=SOAP_INTERFACE_V2))
 
     def editUser (self, uuid, username, password, firstname, lastname, email):
         return value_as_string(self._call ('editUser', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('uuid', 'xsd:string', uuid),
-                ('name', 'xsd:string', username),
-                ('password', 'xsd:string', password),
-                ('first', 'xsd:string', firstname),
-                ('last', 'xsd:string', lastname),
-                ('email', 'xsd:string', email),
-            ), facade=SOAP_INTERFACE_V2))
+            ('ssid', 'xsd:string', self.sessionid),
+            ('uuid', 'xsd:string', uuid),
+            ('name', 'xsd:string', username),
+            ('password', 'xsd:string', password),
+            ('first', 'xsd:string', firstname),
+            ('last', 'xsd:string', lastname),
+            ('email', 'xsd:string', email),
+        ), facade=SOAP_INTERFACE_V2))
 
     def removeUser (self, uuid):
         self._call ('removeUser', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('uuid', 'xsd:string', uuid),
-            ), facade=SOAP_INTERFACE_V2)
+            ('ssid', 'xsd:string', self.sessionid),
+            ('uuid', 'xsd:string', uuid),
+        ), facade=SOAP_INTERFACE_V2)
 
     def addUserToGroup (self, uuid, groupId):
         self._call ('addUserToGroup', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('uuid', 'xsd:string', uuid),
-                ('groupid', 'xsd:string', groupId),
-            ), facade=SOAP_INTERFACE_V2)
+            ('ssid', 'xsd:string', self.sessionid),
+            ('uuid', 'xsd:string', uuid),
+            ('groupid', 'xsd:string', groupId),
+        ), facade=SOAP_INTERFACE_V2)
 
     def removeUserFromGroup (self, uuid, groupId):
         self._call ('removeUserFromGroup', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('uuid', 'xsd:string', uuid),
-                ('groupid', 'xsd:string', groupId),
-            ), facade=SOAP_INTERFACE_V2)
+            ('ssid', 'xsd:string', self.sessionid),
+            ('uuid', 'xsd:string', uuid),
+            ('groupid', 'xsd:string', groupId),
+        ), facade=SOAP_INTERFACE_V2)
 
     def removeUserFromAllGroups (self, userId):
         self._call ('removeUserFromAllGroups', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('userUuid', 'xsd:string', userId),
-            ), facade=SOAP_INTERFACE_V2)
+            ('ssid', 'xsd:string', self.sessionid),
+            ('userUuid', 'xsd:string', userId),
+        ), facade=SOAP_INTERFACE_V2)
 
     def isUserInGroup (self, userId, groupId):
         return value_as_string(self._call ('isUserInGroup', (
-                ('ssid', 'xsd:string', self.sessionid),
-                ('userUuid', 'xsd:string', userId),
-                ('groupUuid', 'xsd:string', groupId),
-            ), facade=SOAP_INTERFACE_V2)) == 'true'
+            ('ssid', 'xsd:string', self.sessionid),
+            ('userUuid', 'xsd:string', userId),
+            ('groupUuid', 'xsd:string', groupId),
+        ), facade=SOAP_INTERFACE_V2)) == 'true'
 
 
 class NewItemClient:
