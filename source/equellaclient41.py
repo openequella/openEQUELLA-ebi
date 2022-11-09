@@ -259,12 +259,7 @@ class TLEClient:
             headers = {}
             cookie = responseInfo.getheader('set-cookie')
             if cookie is not None:
-                for cookie_part in cookie.split(','):
-                    for cookie_name in cookie_part.split(','):
-                        if not cookie_name.upper().split("=")[0].strip() in ["PATH", "DOMAIN", "EXPIRES", "SECURE",
-                                                                             "HTTPONLY"]:
-                            # save cookie
-                            self._cookieJar.append(cookie_name)
+                self._cookieJar = cookie.split(',')
 
             if self.owner.networkLogging:
                 self.owner.echo("HTTP RESPONSE:\n")
