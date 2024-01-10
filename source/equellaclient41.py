@@ -258,11 +258,21 @@ class TLEClient:
             responseInfo = response.info()
             headers = {}
             cookie = responseInfo.getheader('set-cookie')
+
+            added_cookie = []
+            for cookie_name in self._cookieJar:
+                name = cookie_name.upper().split("=")[0].strip()
+                if ";" in name:
+                    name = name.split(";")[1].strip()
+                added_cookie.append(name)
+
             if cookie is not None:
                 for cookie_part in cookie.split(','):
                     for cookie_name in cookie_part.split(','):
-                        if not cookie_name.upper().split("=")[0].strip() in ["PATH", "DOMAIN", "EXPIRES", "SECURE",
-                                                                             "HTTPONLY"]:
+                        name = cookie_name.upper().split("=")[0].strip()
+                        if ";" in name:
+                            name = name.split(";")[1].strip()
+                        if not name in ["PATH", "DOMAIN", "EXPIRES", "SECURE", "HTTPONLY"] and not name in added_cookie:
                             # save cookie
                             self._cookieJar.append(cookie_name)
 
