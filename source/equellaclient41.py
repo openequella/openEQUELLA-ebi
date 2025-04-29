@@ -853,8 +853,6 @@ class NewItemClient:
                         self.owner.echo(showstatus + " Uploading...Halted by user", False)
                     break
                 uploaded += len(chunk)
-                #encodedChunk = b2a_base64(chunk)
-                # Nelson: To fix '\n' issue in base64 encoding
                 encodedChunk = base64.b64encode(chunk)
 
                 self.parClient._uploadFile (self.stagingid, path, encodedChunk, firstChunk)
