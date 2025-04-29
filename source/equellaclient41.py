@@ -34,6 +34,7 @@ from urlparse import urlparse
 import codecs
 import os, os.path, traceback, time
 from string import ascii_letters
+import base64
 import wx
 import ssl
 
@@ -852,7 +853,10 @@ class NewItemClient:
                         self.owner.echo(showstatus + " Uploading...Halted by user", False)
                     break
                 uploaded += len(chunk)
-                encodedChunk = b2a_base64(chunk)
+                #encodedChunk = b2a_base64(chunk)
+                # Nelson: To fix '\n' issue in base64 encoding
+                encodedChunk = base64.b64encode(chunk)
+
                 self.parClient._uploadFile (self.stagingid, path, encodedChunk, firstChunk)
 
                 if firstChunk == "true":
