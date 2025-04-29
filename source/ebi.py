@@ -20,7 +20,7 @@
 # system settings (do not change!)
 Version = "4.73"
 Copyright = """
-Copyright <2024>, The Apereo Foundation
+Copyright (c) 2024, The Apereo Foundation
 
 This project includes software developed by The Apereo Foundation.
 http://www.apereo.org/
