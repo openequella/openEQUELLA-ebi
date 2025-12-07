@@ -1,19 +1,92 @@
-echo Y | RD /S dist
-echo Y | del ebi
-python setup.py py2exe
-echo Y | RD /S ebi
-echo Y | del ebi.zip
+@echo off
+REM Build script for EBI Windows distribution using PyInstaller
+REM Creates ebi.zip containing the packaged application
+
+echo ========================================
+echo Building EQUELLA Bulk Importer (Windows)
+echo ========================================
+echo.
+
+REM Check if Python 3 is available
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python not found in PATH
+    echo Please install Python 3 and ensure it's in your PATH
+    pause
+    exit /b 1
+)
+
+REM Check if PyInstaller is installed
+python -c "import PyInstaller" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: PyInstaller not found
+    echo Installing PyInstaller...
+    python -m pip install pyinstaller
+    if errorlevel 1 (
+        echo ERROR: Failed to install PyInstaller
+        pause
+        exit /b 1
+    )
+)
+
+REM Clean previous build artifacts
+echo Cleaning previous build...
+if exist dist rmdir /s /q dist
+if exist build rmdir /s /q build
+if exist ebi rmdir /s /q ebi
+if exist ebi.zip del /q ebi.zip
+
+REM Build with PyInstaller
+echo.
+echo Building executable with PyInstaller...
+python setup.py
+if errorlevel 1 (
+    echo ERROR: Build failed
+    pause
+    exit /b 1
+)
+
+REM Check if build succeeded
+if not exist dist\ebi.exe (
+    echo ERROR: Build succeeded but ebi.exe not found
+    pause
+    exit /b 1
+)
+
+REM Rename dist to ebi for distribution
+echo Preparing distribution directory...
 rename dist ebi
-copy ebi.py ebi
-copy MainFrame.py ebi
-copy OptionsDialog.py ebi
-copy Engine.py ebi
-copy equellaclient41.py ebi
-copy fileopen.png ebi
-copy filesave.png ebi
-copy gtk-stop.png ebi
-copy gtk-help.png ebi
-copy options.png ebi
-copy pause.png ebi
-copy ebibig.ico ebi
+
+REM PyInstaller includes everything needed, but copy source files for reference
+echo Copying source files for reference...
+if not exist ebi\source mkdir ebi\source
+copy ..\source\ebi.py ebi\source\ >nul 2>&1
+copy ..\source\MainFrame.py ebi\source\ >nul 2>&1
+copy ..\source\OptionsDialog.py ebi\source\ >nul 2>&1
+copy ..\source\Engine.py ebi\source\ >nul 2>&1
+copy ..\source\equellaclient41.py ebi\source\ >nul 2>&1
+copy ..\source\ebi.properties ebi\source\ >nul 2>&1
+
+REM Create zip package
+echo.
+echo Creating distribution archive...
 python package.py
+if errorlevel 1 (
+    echo ERROR: Packaging failed
+    pause
+    exit /b 1
+)
+
+REM Verify zip was created
+if not exist ebi.zip (
+    echo ERROR: ebi.zip was not created
+    pause
+    exit /b 1
+)
+
+echo.
+echo ========================================
+echo Build complete: ebi.zip
+echo ========================================
+echo.
+pause

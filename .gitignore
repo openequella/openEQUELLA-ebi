@@ -1,1 +1,8 @@
 *.pyc
+logs
+*/logs
+*/logs/**
+*/.eggs
+*/build
+*/dist
+*/ebi

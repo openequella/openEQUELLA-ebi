@@ -25,18 +25,19 @@
 #~ JK - 2014 - removeNode() supports xpath indexes
 #~ JK - 2015 - added support for additional xpath predicates
 
-import time, md5, urllib
-import sys, urllib2, re, cookielib
+import time, hashlib, urllib.request, urllib.parse, urllib.error
+import sys, re, http.cookiejar
 from xml.dom.minidom import parse, parseString
 from xml.dom import Node
 from binascii import b2a_base64
-from urlparse import urlparse
+from urllib.parse import urlparse
 import codecs
 import os, os.path, traceback, time
 from string import ascii_letters
 import base64
 import wx
 import ssl
+import binascii
 
 ASCII_ENC = codecs.getencoder('us-ascii')
 
@@ -96,8 +97,9 @@ def stripNode(node, recurse=False):
                 stripNode(childNode, True)
 
 def clean_unicode (s):
-    if s.__class__ == unicode:
-        return ASCII_ENC (s, 'xmlcharrefreplace') [0]
+    # Python 3: str is unicode, bytes needs decoding
+    if isinstance(s, str):
+        return s.encode('ascii', 'xmlcharrefreplace').decode('ascii')
     else:
         return s
 
@@ -143,7 +145,7 @@ def generate_soap_envelope (name, params, ns, token=None):
     }
 
 def urlEncode(text):
-    return urllib.urlencode ({'q': text}) [2:]
+    return urllib.parse.urlencode({'q': text})[2:]
 
 def generateToken(username, sharedSecretId, sharedSecretValue):
     seed = str (int (time.time ())) + '000'
@@ -155,9 +157,9 @@ def generateToken(username, sharedSecretId, sharedSecretValue):
             urlEncode(username),
             id2,
             seed,
-            binascii.b2a_base64(hashlib.md5(
+            binascii.b2a_base64(hashlib.md5((
                 username + sharedSecretId + seed + sharedSecretValue
-            ).digest())
+            ).encode()).digest())
         )
 
 # Class designed to make communicated with TLE very easy!
@@ -193,19 +195,19 @@ class TLEClient:
         self.proxyusername = proxyusername
         self.proxypassword = proxypassword
         if self.proxy != "":
-            password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+            password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
             password_mgr.add_password(None, self.proxy, self.proxyusername, self.proxypassword)
-            proxy_auth_handler = urllib2.ProxyBasicAuthHandler(password_mgr)
-            proxy_handler = urllib2.ProxyHandler({"http": self.proxy})
+            proxy_auth_handler = urllib.request.ProxyBasicAuthHandler(password_mgr)
+            proxy_handler = urllib.request.ProxyHandler({"http": self.proxy})
 
             # build URL opener with proxy
-            #opener = urllib2.build_opener(proxy_handler, proxy_auth_handler, self._cookieProcessor)
-            opener = urllib2.build_opener(proxy_handler, proxy_auth_handler)
+            #opener = urllib.request.build_opener(proxy_handler, proxy_auth_handler, self._cookieProcessor)
+            opener = urllib.request.build_opener(proxy_handler, proxy_auth_handler)
         else:
             # build URL opener without proxy
-            #opener = urllib2.build_opener(self._cookieProcessor)
-            opener = urllib2.build_opener()
-        urllib2.install_opener(opener)
+            #opener = urllib.request.build_opener(self._cookieProcessor)
+            opener = urllib.request.build_opener()
+        urllib.request.install_opener(opener)
 
         if sso:
             self.sessionid = self._createSoapSessionFromToken (createSSOToken (username, password))
@@ -220,7 +222,16 @@ class TLEClient:
                 headers['Cookie'] = "; ".join(self._cookieJar)
 
             endpointUrl = self.institutionUrl + "/" + facade
+            # DO NOT pass session token in SOAP header - use cookies only (like Python 2)
+            # Token-based auth causes EQUELLA to be more restrictive with permissions
             wsenvelope = generate_soap_envelope (name, args, ns)
+            
+            # Debug cookie usage
+            if name == 'getContributableCollections':
+                print(f"\n=== Cookie Debug for {name} ===")
+                print(f"Number of cookies: {len(self._cookieJar)}")
+                print(f"Cookies being sent: {self._cookieJar[:3] if len(self._cookieJar) > 3 else self._cookieJar}")
+                print("=" * 50)
 
             if self.owner.networkLogging:
                 self.owner.echo("\n\n*************************************************************")
@@ -247,18 +258,33 @@ class TLEClient:
                 self.owner.echo(" Cookies:\n%s\n" % self._cookieJar)
 
             # make request
-            request = urllib2.Request(endpointUrl, wsenvelope, headers)
+            request = urllib.request.Request(endpointUrl, wsenvelope.encode('utf-8'), headers)
             context = ssl._create_unverified_context()
-            response = urllib2.urlopen(request, context=context)
-            #response = urllib2.urlopen(request)
+            response = urllib.request.urlopen(request, context=context)
+            #response = urllib.request.urlopen(request)
 
             # read response and close connection
-            s = response.read ()
+            s = response.read()
+            if isinstance(s, bytes):
+                s = s.decode('utf-8')
             response.close()
 
             responseInfo = response.info()
             headers = {}
-            cookie = responseInfo.getheader('set-cookie')
+            cookie = responseInfo.get('set-cookie')  # Python 3: getheader() -> get()
+            
+            # Debug: Show ALL Set-Cookie headers
+            if name == 'login':
+                print(f"\n=== Login Response Cookie Debug ===")
+                print(f"set-cookie header value: {cookie}")
+                all_cookies = responseInfo.get_all('set-cookie')
+                if all_cookies:
+                    print(f"All Set-Cookie headers ({len(all_cookies)} total):")
+                    for i, c in enumerate(all_cookies):
+                        print(f"  [{i}]: {c[:150]}")
+                else:
+                    print("No Set-Cookie headers found (get_all returned None)")
+                print("=" * 50)
 
             added_cookie = []
             for cookie_name in self._cookieJar:
@@ -267,15 +293,20 @@ class TLEClient:
                     name = name.split(";")[1].strip()
                 added_cookie.append(name)
 
-            if cookie is not None:
-                for cookie_part in cookie.split(','):
-                    for cookie_name in cookie_part.split(','):
-                        name = cookie_name.upper().split("=")[0].strip()
-                        if ";" in name:
-                            name = name.split(";")[1].strip()
-                        if not name in ["PATH", "DOMAIN", "EXPIRES", "SECURE", "HTTPONLY"] and not name in added_cookie:
-                            # save cookie
-                            self._cookieJar.append(cookie_name)
+            # Python 3: get_all() returns all Set-Cookie headers (there may be multiple)
+            all_set_cookies = responseInfo.get_all('set-cookie')
+            if all_set_cookies:
+                for cookie in all_set_cookies:
+                    if cookie is not None:
+                        for cookie_part in cookie.split(','):
+                            for cookie_name in cookie_part.split(','):
+                                name = cookie_name.upper().split("=")[0].strip()
+                                if ";" in name:
+                                    name = name.split(";")[1].strip()
+                                if not name in ["PATH", "DOMAIN", "EXPIRES", "SECURE", "HTTPONLY"] and not name in added_cookie:
+                                    # save cookie
+                                    self._cookieJar.append(cookie_name)
+                                    added_cookie.append(name)
 
             if self.owner.networkLogging:
                 self.owner.echo("HTTP RESPONSE:\n")
@@ -283,11 +314,17 @@ class TLEClient:
                 self.owner.echo(" Cookies:\n%s\n" % self._cookieJar)
                 self.owner.echo(" Response Body:\n%s\n" % s)
 
-        except urllib2.HTTPError, e:
+        except urllib.error.HTTPError as e:
             httpErrorBody = ""
-            httpError = e.reason
+            # e.reason can be bytes in Python 3, convert properly
+            if isinstance(e.reason, bytes):
+                httpError = e.reason.decode('utf-8')
+            else:
+                httpError = str(e.reason)
             try:
                 httpErrorBody = e.read()
+                if isinstance(httpErrorBody, bytes):
+                    httpErrorBody = httpErrorBody.decode('utf-8')
             except:
                 pass
             if self.owner.networkLogging:
@@ -303,22 +340,22 @@ class TLEClient:
 
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                errorString += "\n" + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)) + "\n"
+                errorString += "\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)) + "\n"
 
             if httpErrorBody != "":
                 try:
                     errordom = parseString(httpErrorBody)
                     faultstring = errordom.firstChild.getElementsByTagName("soap:Body")[0].getElementsByTagName("soap:Fault")[0].getElementsByTagName("faultstring")[0].firstChild.nodeValue
-                    errorString += faultstring
+                    errorString += str(faultstring)
                 except:
-                    errorString += httpError
+                    errorString += str(httpError)
             else:
-                errorString += httpError
+                errorString += str(httpError)
 
-            raise Exception, errorString
+            raise Exception(errorString)
 
-##        except urllib2.URLError, e:
-##            raise Exception, str(e.args[0][1])
+##        except urllib.error.URLError as e:
+##            raise Exception(str(e.args[0][1]))
 
         except:
             if self.owner.networkLogging:
@@ -328,11 +365,10 @@ class TLEClient:
                 self.owner.echo("*************************************************************\n\n")
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                errorString = "\n" + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)) + "\n"
+                errorString = "\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)) + "\n"
             else:
-                errorString = sys.exc_info()[1]
-            raise Exception, errorString
-
+                errorString = str(sys.exc_info()[1])
+            raise Exception(errorString)
         try:
             dom = parseString(s)
         except:
@@ -344,12 +380,12 @@ class TLEClient:
             errorString = ""
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                errorString += "\n" + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)) + "\n"
-            errorString += "Cannot parse server response as XML\n" + s
-            raise Exception, errorString
-
+                errorString += "\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)) + "\n"
+            errorString += "Cannot parse server response as XML\n" + str(s)
+            raise Exception(errorString)
+            
         if len (dom.getElementsByTagNameNS ('http://schemas.xmlsoap.org/soap/envelope/', 'Fault')):
-            raise Exception, 'Server returned following SOAP error: %s' % dom.toprettyxml ()
+            raise Exception('Server returned following SOAP error: %s' % dom.toprettyxml())
         elif returns: # then return a result
 
             returnValue = dom.firstChild.getElementsByTagName("soap:Body")[0].firstChild.firstChild
@@ -384,11 +420,18 @@ class TLEClient:
         return value_as_string (result)
 
     def _createSoapSession (self, username, password):
+        print(f"\nLogging in as {username}...")
         result = self._call ('login', (
                 ('username', 'xsd:string', username),
                 ('password', 'xsd:string', password),
             ))
-        return value_as_string (result)
+        session_token = value_as_string (result)
+        print(f"Login successful!")
+        print(f"Session cookies received: {len(self._cookieJar)} cookie(s)")
+        if len(self._cookieJar) > 0:
+            print(f"Cookie details: {self._cookieJar[:2]}")
+        print()
+        return session_token
 
     def logout (self):
         self._call ('logout', (
@@ -404,9 +447,9 @@ class TLEClient:
         retry = True
         while retry:
             try:
-                request = urllib2.Request(url, headers=headers)
+                request = urllib.request.Request(url, headers=headers)
                 context = ssl._create_unverified_context()
-                response = urllib2.urlopen(request, context=context)
+                response = urllib.request.urlopen(request, context=context)
                 f = open(filepath, "wb")
                 f.write(response.read())
                 try:
@@ -415,22 +458,23 @@ class TLEClient:
                     pass
                 retry = False
 
-            except urllib2.URLError, err:
+            except urllib.error.URLError as err:
                 if hasattr(err, 'reason'):
-                    if str(err.reason).find("10054") != -1:
-                        print err.reason
-                        print "Retrying..."
+                    reason_str = err.reason.decode('utf-8') if isinstance(err.reason, bytes) else str(err.reason)
+                    if reason_str.find("10054") != -1:
+                        print(reason_str)
+                        print("Retrying...")
                     else:
                         retry = False
-                        raise Exception, "url/http error: " + str(err.reason)
+                        raise Exception("url/http error: " + reason_str)
                 if hasattr(err, 'code'):
                         retry = False
-                        raise Exception, "url/http error code: " + str(err.code)
+                        raise Exception("url/http error code: " + str(err.code))
             except:
                 err = sys.exc_info()[1]
                 if str(err).find("10054") != -1:
-                    print err
-                    print "Retrying..."
+                    print(err)
+                    print("Retrying...")
                 else:
                     retry = False
                     raise err
@@ -443,23 +487,24 @@ class TLEClient:
         retry = True
         while retry:
             try:
-                request = urllib2.Request(url, headers=headers)
+                request = urllib.request.Request(url, headers=headers)
                 context = ssl._create_unverified_context()
-                response = urllib2.urlopen(request, context=context)
+                response = urllib.request.urlopen(request, context=context)
                 retry = False
                 return response.read()
-            except urllib2.URLError, err:
-                if str(err.reason).find("10054"):
-                    print err.reason
-                    print "Retrying..."
+            except urllib.error.URLError as err:
+                reason_str = err.reason.decode('utf-8') if isinstance(err.reason, bytes) else str(err.reason)
+                if reason_str.find("10054"):
+                    print(reason_str)
+                    print("Retrying...")
                 else:
                     retry = False
-                    raise err.reason
+                    raise Exception(reason_str)
             except:
                 err = sys.exc_info()[1]
                 if str(err).find("10054") != -1:
-                    print err
-                    print "Retrying..."
+                    print(err)
+                    print("Retrying...")
                 else:
                     retry = False
                     raise err
@@ -473,10 +518,23 @@ class TLEClient:
                 ('outpath', 'xsd:string', outpath),
             ), returns=0)
 
-    def _enumerateItemDefs (self):
-        result = self._call('getContributableCollections', (
-            ))
-        return dict ([(get_named_child_value (itemdef, 'name'), {'uuid': get_named_child_value (itemdef, 'uuid')}) for itemdef in parseString (value_as_string (result)).getElementsByTagName ('itemdef')])
+    def _enumerateItemDefs (self, forExport=False):
+        # EQUELLA has multiple methods for getting collections:
+        # Use getContributableCollections with cookie-based session (like Python 2)
+        result = self._call('getContributableCollections', ())
+        result_str = value_as_string(result)
+        
+        parsed_xml = parseString(result_str)
+        itemdefs = parsed_xml.getElementsByTagName('itemdef')
+        print(f"getContributableCollections returned {len(itemdefs)} collection(s)")
+        
+        collections_dict = {}
+        for itemdef in itemdefs:
+            name = get_named_child_value(itemdef, 'name')
+            uuid = get_named_child_value(itemdef, 'uuid')
+            collections_dict[name] = {'uuid': uuid}
+        
+        return collections_dict
 
     def _newItem (self, itemdefid):
         result = self._call ('newItem', (
@@ -499,7 +557,8 @@ class TLEClient:
                 ('version', 'xsd:int', str (itemversion)),
                 ('copyattachments', 'xsd:boolean', str (copyattachments)),
             ))
-        return parseString (value_as_string (result))
+        dom = parseString (value_as_string (result))
+        return dom
 
     def _forceUnlock (self, itemid, itemversion):
         result = self._call ('unlock', (
@@ -674,8 +733,7 @@ class TLEClient:
             if saveNonexistentUsernamesAsIDs:
                 self.setOwner(itemID, version, username)
             else:
-                raise Exception, "User [%s] not found in EQUELLA" % username
-
+                raise Exception("User [%s] not found in EQUELLA" % username)
     def addSharedOwner (self, itemid, itemversion, ownerid):
         result = self._call ('addSharedOwner', (
                 ('itemid', 'xsd:string', itemid),
@@ -699,8 +757,7 @@ class TLEClient:
                 if saveNonexistentUsernamesAsIDs:
                     self.addSharedOwner(itemid, itemversion, username)
                 else:
-                    raise Exception, "User [%s] not found in EQUELLA" % username
-
+                    raise Exception("User [%s] not found in EQUELLA" % username)
     def removeSharedOwner (self, itemid, itemversion, ownerid):
         result = self._call ('removeSharedOwner', (
                 ('itemid', 'xsd:string', itemid),
@@ -796,9 +853,23 @@ class NewItemClient:
         self.xml = self.newDom.firstChild
         self.uuid = self.prop.getNode("item/@id")
         self.version =  self.prop.getNode("item/@version")
+        
+        # DEBUG: Print what's in the item when we load it
+        xml_str = self.newDom.toxml()
+        # Check if itembody/attachments exists
+        if '<itembody>' in xml_str:
+            start = xml_str.find('<itembody>')
+            end = xml_str.find('</itembody>') + len('</itembody>')
+        if '<attachments>' in xml_str:
+            start = xml_str.find('<attachments>')
+            end = xml_str.find('</attachments>') + len('</attachments>')
 
         if copyattachments:
             self.stagingid = self.prop.getNode("item/staging")
+        
+        # If no staging ID exists (new item), use the item UUID as staging ID
+        if not self.stagingid:
+            self.stagingid = self.uuid
 
         # remove old version references to non-existent start-pages
         if newversion and not copyattachments:
@@ -822,81 +893,154 @@ class NewItemClient:
 
     # Upload a file as an attachment to this item. path is where the item will live inside of the repository, and should not contain a preceding slash.
     # e.g. item.attachFile ('support/song.wav', file ('c:\\Documents and Settings\\adame\\Desktop\\song.wav', 'rb'))
-    # Parent directories are automatically created as required.
-    # Uploads file in chunks of 16MB. If file is large (e.g. over 16MB) pass in parameter showstatus as a prefix to a progress report
-    # e.g. item.attachFile ('support/song.wav', file ('video.avi', 'rb'), '     Progress: ')
     def attachFile (self, path, attachment, showstatus=None, chunk_size=(1024 * 2048)):
+        """Upload a file to the item in the current editing session.
+        
+        Files are uploaded in chunks (default 16MB). Parent directories are automatically created as required.
+        
+        Args:
+            path: Server path for the file (e.g. 'support/song.wav')
+            attachment: File object opened in binary read mode
+            showstatus: Optional status message prefix for progress reporting
+            chunk_size: Upload chunk size in bytes (default 2MB)
+        
+        Example:
+            item.attachFile('support/song.wav', open('video.avi', 'rb'), '     Progress: ')
+        """
+        # Validate attachment object
+        if attachment is None:
+            raise Exception("Attachment file object is None")
+        
+        if not hasattr(attachment, 'read'):
+            raise Exception("Attachment is not a valid file object")
+        
+        if not hasattr(attachment, 'name'):
+            raise Exception("Attachment file object does not have a 'name' attribute")
+        
         if showstatus:
             if self.debug:
                 self.owner.echo(showstatus + " Uploading...")
             else:
-                self.owner.log.SetReadOnly(False)
-                self.owner.log.AppendText(showstatus + " Uploading...")
-                self.owner.log.SetReadOnly(True)
-                sys.stdout.write(showstatus + " Uploading...")
-                sys.stdout.flush()
+                try:
+                    if self.owner.log is not None:
+                        self.owner.log.SetReadOnly(False)
+                        self.owner.log.AppendText(showstatus + " Uploading...")
+                        self.owner.log.SetReadOnly(True)
+                except Exception as e:
+                    pass
+                
+                try:
+                    if sys.stdout is not None:
+                        sys.stdout.write(showstatus + " Uploading...")
+                        sys.stdout.flush()
+                except Exception as e:
+                    pass
         try:
             firstChunk = "true"
-            filesize = os.path.getsize(attachment.name)
+            # Get file size with better error handling
+            try:
+                filesize = os.path.getsize(attachment.name)
+            except (OSError, IOError) as e:
+                raise Exception("Cannot access file '{}': {}".format(attachment.name, str(e)))
+            
             uploaded = 0
-            for chunk in self.read_in_chunks(attachment, chunk_size):
-                wx.GetApp().Yield()
-                if self.owner.StopProcessing:
-                    if self.debug:
-                        self.owner.echo(showstatus + " Halted by user")
-                    else:
-                        self.owner.log.SetReadOnly(False)
-                        self.owner.log.AppendText("\n")
-                        self.owner.log.SetReadOnly(True)
-
-                        sys.stdout.write("Halted by user\n")
-                        self.owner.echo(showstatus + " Uploading...Halted by user", False)
-                    break
-                uploaded += len(chunk)
-                encodedChunk = base64.b64encode(chunk)
-
-                self.parClient._uploadFile (self.stagingid, path, encodedChunk, firstChunk)
-
-                if firstChunk == "true":
-                    firstChunk = "false"
-                if showstatus:
-                    if self.debug:
-                        progressReport = showstatus + " chunk=%s, uploaded=%s/%s" % (len(chunk), uploaded, filesize)
-                        self.owner.echo(progressReport)
-                        if uploaded >= filesize:
-                            self.owner.echo("    Done")
-                        self.owner.tryPausing("    [Paused]")
-                    else:
-                        if uploaded >= filesize:
-                            self.owner.echo(showstatus + " Uploading...Done", False)
-                            sys.stdout.write("Done\n")
-
-                            self.owner.log.DocumentEnd()
-                            self.owner.log.SetReadOnly(False)
-                            self.owner.log.DelLineLeft()
-                            self.owner.log.AppendText(showstatus + " Uploading...Done\n")
-                            self.owner.log.SetReadOnly(True)
+            try:
+                for chunk in self.read_in_chunks(attachment, chunk_size):
+                    wx.GetApp().Yield()
+                    if self.owner.StopProcessing:
+                        if self.debug:
+                            self.owner.echo(showstatus + " Halted by user")
                         else:
-                            sys.stdout.write(".")
-                            sys.stdout.flush()
+                            if self.owner.log is not None:
+                                self.owner.log.SetReadOnly(False)
+                                self.owner.log.AppendText("\n")
+                                self.owner.log.SetReadOnly(True)
 
-                            progressString = showstatus + " Uploading...%s%%" % ((uploaded * 100)/ filesize)
-                            self.owner.log.DocumentEnd()
-                            self.owner.log.SetReadOnly(False)
-                            self.owner.log.DelLineLeft()
-                            self.owner.log.AppendText(progressString)
-                            self.owner.log.SetReadOnly(True)
-                            self.owner.tryPausing("    [Paused]", newline = True)
-        except:
+                            try:
+                                if sys.stdout is not None:
+                                    sys.stdout.write("Halted by user\n")
+                            except Exception as e:
+                                pass
+                            self.owner.echo(showstatus + " Uploading...Halted by user", False)
+                        break
+                    uploaded += len(chunk)
+                    encodedChunk = b2a_base64(chunk).decode('ascii').strip()
+                    
+                    self.parClient._uploadFile (self.stagingid, path, encodedChunk, firstChunk)
+
+                    if firstChunk == "true":
+                        firstChunk = "false"
+                    if showstatus:
+                        if self.debug:
+                            progressReport = showstatus + " chunk=%s, uploaded=%s/%s" % (len(chunk), uploaded, filesize)
+                            self.owner.echo(progressReport)
+                            if uploaded >= filesize:
+                                self.owner.echo("    Done")
+                            self.owner.tryPausing("    [Paused]")
+                        else:
+                            if uploaded >= filesize:
+                                self.owner.echo(showstatus + " Uploading...Done", False)
+                                try:
+                                    if sys.stdout is not None:
+                                        sys.stdout.write("Done\n")
+                                except Exception as e:
+                                    self.owner.echo("DEBUG: Error writing to stdout: %s" % str(e))
+
+                                if self.owner.log is not None:
+                                    self.owner.log.DocumentEnd()
+                                    self.owner.log.SetReadOnly(False)
+                                    self.owner.log.DelLineLeft()
+                                    self.owner.log.AppendText(showstatus + " Uploading...Done\n")
+                                    self.owner.log.SetReadOnly(True)
+                            else:
+                                try:
+                                    if sys.stdout is not None:
+                                        sys.stdout.write(".")
+                                        sys.stdout.flush()
+                                except Exception as e:
+                                    pass
+
+                                progressString = showstatus + " Uploading...%s%%" % ((uploaded * 100)/ filesize)
+                                if self.owner.log is not None:
+                                    self.owner.log.DocumentEnd()
+                                    self.owner.log.SetReadOnly(False)
+                                    self.owner.log.DelLineLeft()
+                                    self.owner.log.AppendText(progressString)
+                                    self.owner.log.SetReadOnly(True)
+                                self.owner.tryPausing("    [Paused]", newline = True)
+            except Exception as chunkError:
+                raise
+        except Exception as uploadError:
             if not self.debug:
-                sys.stdout.write("\n")
+                try:
+                    if sys.stdout is not None:
+                        sys.stdout.write("\n")
+                except Exception as e:
+                    pass
             raise
 
     def unzipFile (self, path, name):
+        """Unzip a previously uploaded file on the EQUELLA server.
+        
+        Args:
+            path: Server path to the zip file (e.g., '_zips/archive.zip')
+            name: Name for the extracted files
+        """
         self.parClient._unzipFile (self.stagingid, path, name)
 
-    # Uploads an IMS package
     def attachIMS (self, file, filename='package.zip', title='', showstatus=None, upload = True, size=1024, uuid="", chunk_size=(4048 * 4048)):
+        """Upload and unzip an IMS (Instructional Management System) package.
+        
+        Args:
+            file: File object to upload
+            filename: Package filename
+            title: Display title for the package
+            showstatus: Optional status message prefix for progress reporting
+            upload: If True, upload the file first before unzipping
+            size: File size in bytes
+            uuid: Attachment identifier
+            chunk_size: Upload chunk size
+        """
         imsfilename = '_IMS/' + filename
         if upload:
             self.attachFile (imsfilename, file, showstatus, chunk_size)
@@ -910,9 +1054,19 @@ class NewItemClient:
         if uuid != '':
             self.prop.setNode("item/itembody/packagefile/@uuid", uuid)
 
-
-    # Uploads a SCORM package
     def attachSCORM (self, file, filename, description, showstatus=None, upload = True, size=1024, uuid = '', chunk_size=(4048 * 4048)):
+        """Upload and unzip a SCORM (Shareable Content Object Reference Model) package.
+        
+        Args:
+            file: File object to upload
+            filename: Package filename
+            description: Display description for the package
+            showstatus: Optional status message prefix for progress reporting
+            upload: If True, upload the file first before unzipping
+            size: File size in bytes
+            uuid: Attachment identifier
+            chunk_size: Upload chunk size
+        """
         if upload:
             scormfilename = '_SCORM/' + filename
             self.attachFile(scormfilename, file, showstatus, chunk_size)
@@ -964,10 +1118,20 @@ class NewItemClient:
 
     # Mark an attached file as a start page to appear on the item summary page.
     # e.g. item.addStartPage ('Great song!', 'support/song.wav')
-    def addStartPage (self, description, path, size=1024, uuid='', thumbnail = ""):
-
-        # delete existing attachment noes of the same /file and /description
-        self.prop.removeNode("item/attachments/attachment[file = '%s']" % path)
+    def addStartPage (self, description, path, size=1024, uuid='', thumbnail = "", appendMode=False, customXPath=None):
+        """Add a file attachment to the item as a start page (viewable file).
+        
+        Args:
+            description: Display name for the attachment
+            path: File path or URL
+            size: File size in bytes
+            uuid: Unique identifier for this attachment
+            thumbnail: Optional thumbnail file path
+            appendMode: If True, append to existing attachments; otherwise replace
+            customXPath: Optional custom XPath to store the attachment UUID at this location
+        """
+        if not appendMode:
+            self.prop.removeNode("item/attachments/attachment[file = '%s']" % path)
 
         attachment = self.prop.newSubtree("item/attachments/attachment")
         attachment.createNode("@type", "local")
@@ -978,14 +1142,42 @@ class NewItemClient:
             attachment.createNode("uuid", uuid)
         if thumbnail != "":
             attachment.createNode("thumbnail", thumbnail)
+        
+        if customXPath and uuid != '':
+            targetPath = customXPath.replace('/xml/', '') if customXPath.startswith('/xml/') else customXPath
+            
+            if not appendMode:
+                self.prop.removeNode(targetPath)
+                self.prop.createNode(targetPath, uuid)
+            else:
+                parts = targetPath.split('/')
+                childName = parts[-1]
+                parentPath = '/'.join(parts[:-1]) if len(parts) > 1 else ''
+                
+                if parentPath:
+                    parentNodes = self.prop.getNodes(parentPath, False)
+                    if not parentNodes:
+                        self.prop.createNode(targetPath, uuid)
+                    else:
+                        parent = parentNodes[0]
+                        newChild = self.prop.document.createElement(childName)
+                        newChild.appendChild(self.prop.document.createTextNode(uuid))
+                        parent.appendChild(newChild)
+                else:
+                    self.prop.createNode(targetPath, uuid)
 
     def deleteAttachments(self):
         self.getXml().removeNode('item/attachments/attachment')
         self.parClient._deleteAttachmentFile(self.stagingid,"")
 
-    # Add a URL as a resource to this item.
-    # e.g. item.addUrl ('Interesting link', 'http://www.thelearningedge.com.au/')
     def addUrl (self, description, url, uuid=''):
+        """Add a URL as a remote resource (link) to this item.
+        
+        Args:
+            description: Display name for the link
+            url: URL to link to
+            uuid: Optional unique identifier for this attachment
+        """
         attachment = self.prop.newSubtree("item/attachments/attachment")
         attachment.createNode("@type", "remote")
         attachment.createNode("conversion", "true")
@@ -993,13 +1185,45 @@ class NewItemClient:
         attachment.createNode("description", description)
         if uuid != '':
             attachment.createNode("uuid", uuid)
+    def addStartPageWithZipAttribute(self, description, path, size=1024, uuid='', zipParentUUID=''):
+        """Add extracted file attachment with ZIP_ATTACHMENT_UUID reference to parent zip.
+        
+        This creates an attachment element with a reference to the parent zip file via the
+        ZIP_ATTACHMENT_UUID attribute, enabling EQUELLA to display extracted files as a grouped set.
+        
+        Args:
+            description: Display name for the attachment
+            path: Path within zip (format: "Archive.zip/filepath")
+            size: File size in bytes
+            uuid: Unique identifier for this attachment
+            zipParentUUID: UUID of the original zip file (for grouping)
+        """
+        attachment = self.prop.newSubtree("item/attachments/attachment")
+        attachment.createNode("@type", "local")
+        attachment.createNode("conversion", "false")
+        attachment.createNode("uuid", uuid)
+        attachment.createNode("file", path)
+        attachment.createNode("description", description)
+        
+        if zipParentUUID != '':
+            attributes = attachment.newSubtree("attributes")
+            entry = attributes.newSubtree("entry")
+            entry.createNode("string", "ZIP_ATTACHMENT_UUID")
+            entry.createNode("string", zipParentUUID)
 
-    # Print tabbed XML for this item, useful for debugging.
     def printXml (self):
-        print ASCII_ENC (self.newDom.toprettyxml (), 'xmlcharrefreplace') [0]
+        """Print formatted XML document of this item to console."""
+        print(ASCII_ENC (self.newDom.toprettyxml (), 'xmlcharrefreplace') [0])
 
-    # Print tabbed XML for this item, useful for debugging.
     def toXml (self, enc="utf-8"):
+        """Return formatted XML string of this item.
+        
+        Args:
+            enc: Character encoding (default: utf-8)
+        
+        Returns:
+            Formatted XML string with proper indentation
+        """
         return self.newDom.toprettyxml ("  ", "\n", enc)
 
     def forceUnlock(self):
@@ -1014,7 +1238,8 @@ class NewItemClient:
     # Save this item into the repository.
     # e.g. item.submit ()
     def submit (self, workflow=1):
-        self.parClient._stopEdit (self.newDom.toxml(), ('false', 'true') [workflow])
+        xml_str = self.newDom.toxml()
+        self.parClient._stopEdit (xml_str, ('false', 'true') [workflow])
 
     def getXml(self):
         return self.prop
@@ -1026,14 +1251,14 @@ class PropBagEx:
         if isinstance (s, PropBagEx) :
             self.document = s.document
             self.root = s.root
-        elif isinstance (s, str) or isinstance(s, unicode):
+        elif isinstance (s, str):
             self.document = parseString(s.encode(encoding))
             self.root = None
             for childNode in self.document.childNodes:
                 if childNode.nodeType == Node.ELEMENT_NODE:
                     self.root = childNode
                     break
-        elif isinstance (s, file) :
+        elif hasattr(s, 'read') :  # Python 3: check for file-like object
             self.document = parse (s)
             self.root = None
             for childNode in self.document.childNodes:
@@ -1092,7 +1317,7 @@ class PropBagEx:
                     parent.setAttribute(childName[1:], "")
                     returnNodes.append(parent.getAttributeNode(childName[1:]))
                 else:
-                    raise Exception, "Attribute cannot have a child node '%s'" % xpath
+                    raise Exception("Attribute cannot have a child node '%s'" % xpath)
             if onlyOne:
                 break
         return returnNodes
@@ -1107,9 +1332,9 @@ class PropBagEx:
                 parentNode = matchingNode.parentNode
                 parentNode.removeChild(matchingNode)
 
-    # Print tabbed XML for this item, useful for debugging.
     def printXml (self):
-        print ASCII_ENC (self.root.toprettyxml (), 'xmlcharrefreplace') [0]
+        """Print formatted XML document to console."""
+        print(ASCII_ENC (self.root.toprettyxml (), 'xmlcharrefreplace') [0])
 
     # return underlying minidom of XmlWrapper
     def toXml (self):
@@ -1182,7 +1407,7 @@ class XPath:
 
     def _selectNodes(self, xpath, asStrings, curNode, validateOnly = False, dl = 0, sd = 0):
         if dl > 1:
-            print " DEBUG", "".ljust(sd),"_selectNodes(<%s>, %s%s)" % (curNode.nodeName, xpath, ", validateOnly" if validateOnly else "")
+            print(" DEBUG", "".ljust(sd),"_selectNodes(<%s>, %s%s)" % (curNode.nodeName, xpath, ", validateOnly" if validateOnly else ""))
 
         step, remainingXpath, delimiter = self.splitFirstOuter(xpath, ["/"], False, dl = dl, sd = sd + 1)
 
@@ -1197,7 +1422,7 @@ class XPath:
             stepNodename = step[:i]
             stepPredicate = step[i + 1:-1]
             if stepPredicate == "":
-                raise Exception, "Empty predicate ('%s')" % step
+                raise Exception("Empty predicate ('%s')" % step)
 
         # XPath validation only
         if validateOnly:
@@ -1210,7 +1435,7 @@ class XPath:
                 # validate nodename
                 if nodename not in ["*", "node()"]:
                     if not all(c in ascii_letters+'-_.0123456789' for c in nodename) or nodename[0] in '-_.0123456789':
-                        raise Exception, "Invalid token in xpath ('%s')" % stepNodename
+                        raise Exception("Invalid token in xpath ('%s')" % stepNodename)
 
                 # evaludate predicate to validate it
                 if stepPredicate != "":
@@ -1221,7 +1446,7 @@ class XPath:
                 self._selectNodes(remainingXpath, False, curNode, validateOnly, dl = dl, sd = sd + 1)
 
             if dl >= 1:
-                print " DEBUG", "".ljust(sd),"_selectNodes(<%s>, %s) -> %s" % (curNode.nodeName, xpath, "VALID")
+                print(" DEBUG", "".ljust(sd),"_selectNodes(<%s>, %s) -> %s" % (curNode.nodeName, xpath, "VALID"))
             return []
 
         # XPath Processing
@@ -1349,7 +1574,7 @@ class XPath:
                     returnValues.append(value)
 
         if dl >= 1:
-            print " DEBUG", "".ljust(sd),"_selectNodes(<%s>, %s) -> %s" % (curNode.nodeName, xpath, returnValues)
+            print(" DEBUG", "".ljust(sd),"_selectNodes(<%s>, %s) -> %s" % (curNode.nodeName, xpath, returnValues))
         return returnValues
 
     def queryAllChildElements(self, xpath, curNode, validateOnly, dl = 0, sd = 0):
@@ -1411,16 +1636,15 @@ class XPath:
             lhs += char
 
         if unclosedBrackets > 0:
-            raise Exception, "Missing ']' in '%s'" % string
+            raise Exception("Missing ']' in '%s'" % string)
         if unclosedBrackets < 0:
-            raise Exception, "Extra ']' in '%s'" % string
+            raise Exception("Extra ']' in '%s'" % string)
         if unclosedParentheses > 0:
-            raise Exception, "Missing ')' in '%s'" % string
+            raise Exception("Missing ')' in '%s'" % string)
         if unclosedParentheses < 0:
-            raise Exception, "Extra ')' in '%s'" % string
+            raise Exception("Extra ')' in '%s'" % string)
         if inDoubleQuote or inSingleQuote:
-            raise Exception, "Unterminated string '%s'" % string
-
+            raise Exception("Unterminated string '%s'" % string)
         if reverse:
             rhsTemp = self.reverseString(lhs)
             lhs = self.reverseString(rhs)
@@ -1428,18 +1652,18 @@ class XPath:
         if dl >= 7:
             if reverse:
                 string = self.reverseString(string)
-            print " DEBUG", "".ljust(sd),"splitFirstOuter('%s', %s) -> %s" % (string, delimiters, (lhs, rhs, foundDelimiter))
+            print(" DEBUG", "".ljust(sd),"splitFirstOuter('%s', %s) -> %s" % (string, delimiters, (lhs, rhs, foundDelimiter)))
         return lhs.strip(), rhs.strip(), foundDelimiter.strip()
 
     def evaluateCondition(self, statement, curNode, validateOnly, nodePosition, sibCount, dl = 0, sd = 0):
         if dl > 2:
-            print " DEBUG", "".ljust(sd),"evaluateCondition(%s)" % (statement)
+            print(" DEBUG", "".ljust(sd),"evaluateCondition(%s)" % (statement))
         lhs, rhs, operator = self.splitFirstOuter(statement, [" and ", " or "], False, dl, sd + 1)
 
         if lhs.strip()[0] == "(":
             i = lhs.rfind(")")
             if i == -1:
-                raise Exception, "Missing ')' " + lhs
+                raise Exception("Missing ')' " + lhs)
             # process statement in parantheses
             lhsResult = self.evaluateCondition(lhs.strip()[1:i], curNode, validateOnly, nodePosition, sibCount, dl, sd + 1)
         else:
@@ -1470,13 +1694,13 @@ class XPath:
         else:
             result = lhsResult
         if dl >= 2:
-            print " DEBUG", "".ljust(sd),"evaluateCondition(%s) -> %s" % (statement, result)
+            print(" DEBUG", "".ljust(sd),"evaluateCondition(%s) -> %s" % (statement, result))
         return result
 
 
     def evaluateComparison(self, string, curNode, validateOnly, nodePosition, sibCount, dl = 0, sd = 0):
         if dl > 3:
-            print " DEBUG", "".ljust(sd),"evaluateComparison(%s)" % (string)
+            print(" DEBUG", "".ljust(sd),"evaluateComparison(%s)" % (string))
         lhs, rhs, operator = self.splitFirstOuter(string, ["=", "!=", "<", ">", "<=", ">="], False, dl = dl, sd = sd + 1)
         lhsResult, lhsResultType = self.evaluateStatement(lhs, curNode, validateOnly, nodePosition, sibCount, dl, sd + 1)
 
@@ -1506,7 +1730,7 @@ class XPath:
         else:
             result = lhsResult, lhsResultType
         if dl >= 3:
-            print " DEBUG", "".ljust(sd),"evaluateComparison(%s) -> %s" % (string, result)
+            print(" DEBUG", "".ljust(sd),"evaluateComparison(%s) -> %s" % (string, result))
         return result
 
     # function for evaluating against different operators
@@ -1535,19 +1759,19 @@ class XPath:
         elif operator == ">=" and lhsValue >= rhsValue:
             result = True, "BOOLEAN"
         if dl >= 4:
-            print " DEBUG", "".ljust(sd),"compareValues(%s %s %s) -> %s" % (lhsValue, operator, rhsValue, result)
+            print(" DEBUG", "".ljust(sd),"compareValues(%s %s %s) -> %s" % (lhsValue, operator, rhsValue, result))
         return result
 
     def evaluateStatement(self, statement, curNode, validateOnly, nodePosition, sibCount, dl = 0, sd = 0):
         if dl > 5:
-            print " DEBUG", "".ljust(sd),"evaluateStatement(%s)" % (statement)
+            print(" DEBUG", "".ljust(sd),"evaluateStatement(%s)" % (statement))
         lhs, rhs, operator = self.splitFirstOuter(statement, ["+", " - "], True, dl, sd + 1)
 
         # check for outer parentheses
         if rhs.strip()[0] == "(":
             i = rhs.rfind(")")
             if i == -1:
-                raise Exception, "Missing ')' " + rhs
+                raise Exception("Missing ')' " + rhs)
             # process statement in parantheses
             rhsResult, rhsResultType = self.evaluateStatement(rhs.strip()[1:i], curNode, validateOnly, nodePosition, sibCount, dl, sd + 1)
         else:
@@ -1560,22 +1784,22 @@ class XPath:
                 if lhsResultType == "NUMBER" and rhsResultType == "NUMBER":
                     result = lhsResult + rhsResult, "NUMBER"
                 else:
-                    raise Exception, "Can only use (+) operator for numbers not %s and %s '%s'" % (lhsResultType, rhsResultType, statement)
+                    raise Exception("Can only use (+) operator for numbers not %s and %s '%s'" % (lhsResultType, rhsResultType, statement))
             else:
                 if lhsResultType == "NUMBER" and rhsResultType == "NUMBER":
                     result = lhsResult - rhsResult, "NUMBER"
                 else:
-                    raise Exception, "Can only use (-) operator for numbers not %s and %s '%s'" % (lhsResultType, rhsResultType, statement)
+                    raise Exception("Can only use (-) operator for numbers not %s and %s '%s'" % (lhsResultType, rhsResultType, statement))
         else:
             result = rhsResult, rhsResultType
         if dl >= 5:
-            print " DEBUG", "".ljust(sd),"evaluateStatement(%s) -> %s" % (statement, result)
+            print(" DEBUG", "".ljust(sd),"evaluateStatement(%s) -> %s" % (statement, result))
         return result
 
 
     def evaluateValue(self, value, curNode, validateOnly, nodePosition, sibCount, dl = 0, sd = 0):
         if dl > 5:
-            print " DEBUG", "".ljust(sd),"evaluateValue(%s)" % (value)
+            print(" DEBUG", "".ljust(sd),"evaluateValue(%s)" % (value))
 
         # integer
         try:
@@ -1606,7 +1830,7 @@ class XPath:
                 # find closing parenthesis
                 i = value.rfind(")")
                 if i == -1:
-                    raise Exception, "Malformed function '%s'" % value
+                    raise Exception("Malformed function '%s'" % value)
                 parameterString = value[value.find("(") + 1:i].strip()
                 if parameterString == "":
                     evaluation = curNode.nodeName, "STRING"
@@ -1699,7 +1923,7 @@ class XPath:
                 # <xpath>
                 evaluation = self._selectNodes(value, asStrings=True, curNode=curNode, validateOnly=validateOnly), "NODE_SET"
         if dl >= 5:
-            print " DEBUG", "".ljust(sd),"evaluateValue(%s) -> %s" % (value, evaluation)
+            print(" DEBUG", "".ljust(sd),"evaluateValue(%s) -> %s" % (value, evaluation))
         return evaluation
 
     def convertToString(self, value, valueType):
@@ -1712,19 +1936,18 @@ class XPath:
         elif valueType == "BOOLEAN":
             convertedValue = "true" if value else "false"
         else:
-            raise Exception, "Cannot convert type %s '%s'" %(valueType, value)
+            raise Exception("Cannot convert type %s '%s'" %(valueType, value))
 
         return convertedValue
 
     def getFunctionParameters(self, string, paramTypes, curNode, validateOnly, nodePosition, sibCount, minParams=-1, dl = 0, sd = 0):
         if dl > 6:
-            print " DEBUG", "".ljust(sd),"getFunctionParameters(%s, %s)" % (string, paramTypes)
+            print(" DEBUG", "".ljust(sd),"getFunctionParameters(%s, %s)" % (string, paramTypes))
 
         # find closing parenthesis
         i = string.rfind(")")
         if i == -1:
-            raise Exception, "Malformed function '%s'" % string
-
+            raise Exception("Malformed function '%s'" % string)
         # split out parameters
         parameterString = string[string.find("(") + 1:i]
         parameters = []
@@ -1752,7 +1975,7 @@ class XPath:
                 msg = "Expecting exactly %s parameters" % minParams
             else:
                 msg = "Expecting between %s and %s parameters" % (minParams, len(paramTypes))
-            raise Exception, "%s '%s'" % (msg, string)
+            raise Exception("%s '%s'" % (msg, string))
 
         # evaluate parameters
         for i, parameter in enumerate(parameters):
@@ -1764,13 +1987,13 @@ class XPath:
 
                 # verify parameter types match expected
                 if parameters[i][1] not in allowedTypes:
-                    raise Exception, "Incorrect parameter type %s in '%s' expecting one of the following %s" % (parameters[i][1], string, allowedTypes)
+                    raise Exception("Incorrect parameter type %s in '%s' expecting one of the following %s" % (parameters[i][1], string, allowedTypes))
 
             elif "BOOLEAN" in allowedTypes:
                 # process boolean parameter
                 parameters[i] = self.evaluateCondition(parameter[0], curNode, validateOnly, nodePosition, sibCount, dl = dl, sd = sd + 1), "BOOLEAN"
         if dl >= 6:
-            print " DEBUG", "".ljust(sd),"getFunctionParameters(%s, %s) -> %s" % (string, paramTypes, parameters)
+            print(" DEBUG", "".ljust(sd),"getFunctionParameters(%s, %s) -> %s" % (string, paramTypes, parameters))
         return parameters
 
 

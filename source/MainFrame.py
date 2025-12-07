@@ -13,13 +13,14 @@ import os, traceback
 import wx
 import wx.grid
 import wx.stc as stc
+import wx.adv
 import OptionsDialog
-import csv, codecs, cStringIO
+import csv, codecs, io
 import random, platform
 import Engine
 from xml.dom.minidom import Document, parse, parseString
-import urllib2
-import ConfigParser
+import urllib.request, urllib.error, urllib.parse
+import configparser
 from equellaclient41 import *
 
 def create(parent):
@@ -64,30 +65,24 @@ class MainFrame(wx.Frame):
     def _init_coll_mainToolbar_Tools(self, parent):
         
         # generated method, don't edit
-        parent.DoAddTool(bitmap=wx.Bitmap(os.path.join(self.scriptFolder,
-              u'fileopen.png'), wx.BITMAP_TYPE_PNG), bmpDisabled=wx.NullBitmap,
-              id=wxID_MAINFRAMEMAINTOOLBAROPEN, kind=wx.ITEM_NORMAL, label='Open',
-              longHelp='', shortHelp=u'Open Settings File')
-        parent.DoAddTool(bitmap=wx.Bitmap(os.path.join(self.scriptFolder,
-              u'filesave.png'), wx.BITMAP_TYPE_PNG), bmpDisabled=wx.NullBitmap,
-              id=wxID_MAINFRAMEMAINTOOLBARSAVE, kind=wx.ITEM_NORMAL, label='Save',
-              longHelp=u'', shortHelp=u'Save Settings (' + self.ctrlButton + '+S)')
-        parent.DoAddTool(bitmap=wx.Bitmap(os.path.join(self.scriptFolder,
-              u'gtk-stop.png'), wx.BITMAP_TYPE_PNG), bmpDisabled=wx.NullBitmap,
-              id=wxID_MAINFRAMEMAINTOOLBARSTOP, kind=wx.ITEM_NORMAL, label='Stop',
-              longHelp=u'', shortHelp=u'Stop Processing')
-        parent.DoAddTool(bitmap=wx.Bitmap(os.path.join(self.scriptFolder,
-              u'pause.png'), wx.BITMAP_TYPE_PNG), bmpDisabled=wx.NullBitmap,
-              id=wxID_MAINFRAMEMAINTOOLBARPAUSE, kind=wx.ITEM_NORMAL, label='Pause',
-              longHelp=u'', shortHelp=u'Pause/Unpause Processing')
-        parent.DoAddTool(bitmap=wx.Bitmap(os.path.join(self.scriptFolder,
-              u'options.png'), wx.BITMAP_TYPE_PNG), bmpDisabled=wx.NullBitmap,
-              id=wxID_MAINFRAMEMAINTOOLBAROPTIONS, kind=wx.ITEM_NORMAL, label='Preferences',
-              longHelp=u'', shortHelp=u'Preferences')
-        parent.DoAddTool(bitmap=wx.Bitmap(os.path.join(self.scriptFolder,
-              u'gtk-help.png'), wx.BITMAP_TYPE_PNG), bmpDisabled=wx.NullBitmap,
-              id=wxID_MAINFRAMEMAINTOOLBARABOUT, kind=wx.ITEM_NORMAL, label='About',
-              longHelp=u'', shortHelp=u'About EQUELLA Bulk Importer')
+        parent.AddTool(wxID_MAINFRAMEMAINTOOLBAROPEN, 'Open',
+              wx.Bitmap(os.path.join(self.scriptFolder, 'fileopen.png'), wx.BITMAP_TYPE_PNG),
+              shortHelp='Open Settings File', kind=wx.ITEM_NORMAL)
+        parent.AddTool(wxID_MAINFRAMEMAINTOOLBARSAVE, 'Save',
+              wx.Bitmap(os.path.join(self.scriptFolder, 'filesave.png'), wx.BITMAP_TYPE_PNG),
+              shortHelp='Save Settings (' + self.ctrlButton + '+S)', kind=wx.ITEM_NORMAL)
+        parent.AddTool(wxID_MAINFRAMEMAINTOOLBARSTOP, 'Stop',
+              wx.Bitmap(os.path.join(self.scriptFolder, 'gtk-stop.png'), wx.BITMAP_TYPE_PNG),
+              shortHelp='Stop Processing', kind=wx.ITEM_NORMAL)
+        parent.AddTool(wxID_MAINFRAMEMAINTOOLBARPAUSE, 'Pause',
+              wx.Bitmap(os.path.join(self.scriptFolder, 'pause.png'), wx.BITMAP_TYPE_PNG),
+              shortHelp='Pause/Unpause Processing', kind=wx.ITEM_NORMAL)
+        parent.AddTool(wxID_MAINFRAMEMAINTOOLBAROPTIONS, 'Preferences',
+              wx.Bitmap(os.path.join(self.scriptFolder, 'options.png'), wx.BITMAP_TYPE_PNG),
+              shortHelp='Preferences', kind=wx.ITEM_NORMAL)
+        parent.AddTool(wxID_MAINFRAMEMAINTOOLBARABOUT, 'About',
+              wx.Bitmap(os.path.join(self.scriptFolder, 'gtk-help.png'), wx.BITMAP_TYPE_PNG),
+              shortHelp='About EQUELLA Bulk Importer', kind=wx.ITEM_NORMAL)
         self.Bind(wx.EVT_TOOL, self.OnMainToolbarSaveTool,
               id=wxID_MAINFRAMEMAINTOOLBARSAVE)
         self.Bind(wx.EVT_TOOL, self.OnMainToolbarSaveTool,
@@ -119,16 +114,22 @@ class MainFrame(wx.Frame):
         # generated method, don't edit
         self.mainBoxSizer = wx.BoxSizer(orient=wx.VERTICAL)
 
-        self.mainBoxSizer.AddWindow(self.mainToolbar, 0, border=0, flag=wx.EXPAND)
-        self.mainBoxSizer.AddWindow(self.nb, 1, border=0, flag=wx.EXPAND)
-        self.mainBoxSizer.AddWindow(self.mainStatusBar, 0, border=0, flag=wx.EXPAND)
+        self.mainBoxSizer.Add(self.mainToolbar, 0, border=0, flag=wx.EXPAND)
+        self.mainBoxSizer.Add(self.nb, 1, border=0, flag=wx.EXPAND)
+        self.mainBoxSizer.Add(self.mainStatusBar, 0, border=0, flag=wx.EXPAND)
         self.SetSizer(self.mainBoxSizer)
 
     def _init_ctrls(self, prnt):
         
-        self.scriptFolder = sys.path[0]
-        if self.scriptFolder.endswith(".zip"):
-            self.scriptFolder = os.path.dirname(self.scriptFolder) 
+        # Handle PyInstaller bundle - use sys._MEIPASS for bundled data files
+        if getattr(sys, 'frozen', False):
+            # Running as PyInstaller bundle
+            self.scriptFolder = sys._MEIPASS
+        else:
+            # Running as script
+            self.scriptFolder = sys.path[0]
+            if self.scriptFolder.endswith(".zip"):
+                self.scriptFolder = os.path.dirname(self.scriptFolder) 
         
         # set ctrl or cmd tooltip depending on platform
         self.ctrlButton = "Ctrl"
@@ -156,17 +157,17 @@ class MainFrame(wx.Frame):
         self.nb.AddPage(self.logPage, "Log")
 
         self.columnsGrid = wx.grid.Grid(id=wxID_MAINFRAMECOLUMNSGRID,
-              name=u'columnsGrid', parent=self.csvPage, pos=wx.Point(0, 125),
+              name='columnsGrid', parent=self.csvPage, pos=wx.Point(0, 125),
               size=wx.Size(1006, 281), style=0)
-        self.columnsGrid.SetToolTipString(u'CSV column settings')
-        self.columnsGrid.Bind(wx.grid.EVT_GRID_CELL_CHANGE,
+        self.columnsGrid.SetToolTip('CSV column settings')
+        self.columnsGrid.Bind(wx.grid.EVT_GRID_CELL_CHANGED,
               self.OnColumnsGridGridCellChange)
 
         self.log = Log(self.logPage)
         
 
         # Connection Page controls
-        self.ConnectionSizer = wx.FlexGridSizer(1, 2)
+        self.ConnectionSizer = wx.FlexGridSizer(cols=2, vgap=0, hgap=0)
         
         self.staticBox = wx.StaticBox(self.connectionPage, -1, "", size=wx.Size(600, 300))
         self.borderBox = wx.StaticBoxSizer(self.staticBox, wx.VERTICAL)
@@ -178,49 +179,49 @@ class MainFrame(wx.Frame):
         self.ConnectionSizer.AddSpacer(25)
 
         label = wx.StaticText(id=-1,
-              label=u'Institution URL:', name='staticText1',
+              label='Institution URL:', name='staticText1',
               parent=self.connectionPage, size=wx.Size(103,
               17), style=wx.ALIGN_RIGHT)
         self.ConnectionSizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 4)
         
         self.txtInstitutionUrl = wx.TextCtrl(id=-1,
-              name=u'txtInstitutionUrl', parent=self.connectionPage,
-              size=wx.Size(422, 21), style=0, value=u'')
-        self.txtInstitutionUrl.SetHelpText(u'Institution URL (e.g. "http://equella.myinstitution.edu/training")')
-        self.txtInstitutionUrl.SetToolTipString(u'EQUELLA institution URL (e.g. "http://equella.myinstitution.org/training")')
+              name='txtInstitutionUrl', parent=self.connectionPage,
+              size=wx.Size(422, 21), style=0, value='')
+        self.txtInstitutionUrl.SetHelpText('Institution URL (e.g. "http://equella.myinstitution.edu/training")')
+        self.txtInstitutionUrl.SetToolTip('EQUELLA institution URL (e.g. "http://equella.myinstitution.org/training")')
         self.ConnectionSizer.Add(self.txtInstitutionUrl)
         
         label = wx.StaticText(id=-1,
-              label=u'Username:', name='staticText1',
+              label='Username:', name='staticText1',
               parent=self.connectionPage, size=wx.Size(103,
               17), style=wx.ALIGN_RIGHT)
         self.ConnectionSizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 4)
 
         self.txtUsername = wx.TextCtrl(id=wxID_MAINFRAMETXTUSERNAME,
-              name=u'txtUsername', parent=self.connectionPage,
-              pos=wx.Point(104, 27), size=wx.Size(155, 21), style=0, value=u'')
-        self.txtUsername.SetToolTipString(u'EQUELLA username')
+              name='txtUsername', parent=self.connectionPage,
+              pos=wx.Point(104, 27), size=wx.Size(155, 21), style=0, value='')
+        self.txtUsername.SetToolTip('EQUELLA username')
         self.ConnectionSizer.Add(self.txtUsername)
 
         label = wx.StaticText(id=-1,
-              label=u'Password:', name='staticText1',
+              label='Password:', name='staticText1',
               parent=self.connectionPage, size=wx.Size(103,
               17), style=wx.ALIGN_RIGHT)
         self.ConnectionSizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 4)
         
         self.txtPassword = wx.TextCtrl(id=wxID_MAINFRAMETXTPASSWORD,
-              name=u'txtPassword', parent=self.connectionPage,
+              name='txtPassword', parent=self.connectionPage,
               pos=wx.Point(104, 52), size=wx.Size(155, 21),
-              style=wx.TE_PASSWORD, value=u'')
+              style=wx.TE_PASSWORD, value='')
         self.txtPassword.Show(True)
-        self.txtPassword.SetToolTipString(u'EQUELLA password')
+        self.txtPassword.SetToolTip('EQUELLA password')
         self.ConnectionSizer.Add(self.txtPassword)
 
         self.btnGetCollections = wx.Button(id=-1,
-              label=u'Test / Get Collections', name=u'btnGetCollections',
+              label='Test / Get Collections', name='btnGetCollections',
               parent=self.connectionPage, pos=wx.Point(529, 2),
               size=wx.Size(155, 35), style=0)
-        self.btnGetCollections.SetToolTipString(u'Connect to EQUELLA and retrieve available collections')
+        self.btnGetCollections.SetToolTip('Connect to EQUELLA and retrieve available collections')
         self.btnGetCollections.Bind(wx.EVT_BUTTON, self.OnBtnGetCollectionsButton)
         self.ConnectionSizer.AddSpacer(15)
         self.ConnectionSizer.Add(self.btnGetCollections)
@@ -229,16 +230,16 @@ class MainFrame(wx.Frame):
         self.ConnectionSizer.AddSpacer(15)
 
         label = wx.StaticText(id=-1,
-              label=u'Collection:', name='staticText4',
+              label='Collection:', name='staticText4',
               parent=self.connectionPage, 
               size=wx.Size(103, 17), style=wx.ALIGN_RIGHT)
         self.ConnectionSizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 4)
               
         self.cmbCollections = wx.Choice(choices=[],
-              id=-1, name=u'cmbCollections',
+              id=-1, name='cmbCollections',
               parent=self.connectionPage, pos=wx.Point(309, 27),
               size=wx.Size(422, 21), style=0)
-        self.cmbCollections.SetToolTipString(u'EQUELLA collection to import CSV content into')
+        self.cmbCollections.SetToolTip('EQUELLA collection to import CSV content into')
         self.ConnectionSizer.Add(self.cmbCollections)     
 
         # CSV Page controls
@@ -251,25 +252,25 @@ class MainFrame(wx.Frame):
         label = wx.StaticText(self.csvPage, -1, "CSV:")
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
         self.txtCSVPath = wx.TextCtrl(id=wxID_MAINFRAMETXTCSVPATH,
-              name=u'txtCSVPath', parent=self.csvPage, size=wx.Size(445, 21), style=0, value=u'')
-        self.txtCSVPath.SetToolTipString(u'File path to CSV')
+              name='txtCSVPath', parent=self.csvPage, size=wx.Size(445, 21), style=0, value='')
+        self.txtCSVPath.SetToolTip('File path to CSV')
         box.Add(self.txtCSVPath, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
 
         self.btnBrowseCSV = wx.Button(id=-1,
-              label=u'Browse...', name=u'btnBrowseCSV',
+              label='Browse...', name='btnBrowseCSV',
               parent=self.csvPage, 
               size=wx.Size(90, 23), style=0)
-        self.btnBrowseCSV.SetHelpText(u'Browse the computer for a CSV file')
-        self.btnBrowseCSV.SetToolTipString(u'Browse the computer for a CSV to load')
+        self.btnBrowseCSV.SetHelpText('Browse the computer for a CSV file')
+        self.btnBrowseCSV.SetToolTip('Browse the computer for a CSV to load')
         self.btnBrowseCSV.Bind(wx.EVT_BUTTON, self.OnBtnBrowseCSVButton)
         box.Add(self.btnBrowseCSV, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
 
         self.btnReloadCSV = wx.Button(id=-1,
-              label=u'Reload CSV', name=u'btnReloadCSV',
+              label='Reload CSV', name='btnReloadCSV',
               parent=self.csvPage, pos=wx.Point(846, 2),
               size=wx.Size(90, 23), style=0)
-        self.btnReloadCSV.SetHelpText(u'Reload the CSV to update the settings for any column heading changes in the CSV')
-        self.btnReloadCSV.SetToolTipString(u'Reload the columns and update for any column heading changes in the CSV')
+        self.btnReloadCSV.SetHelpText('Reload the CSV to update the settings for any column heading changes in the CSV')
+        self.btnReloadCSV.SetToolTip('Reload the columns and update for any column heading changes in the CSV')
         self.btnReloadCSV.Bind(wx.EVT_BUTTON, self.OnBtnReloadCSVButton, id=-1)
         box.Add(self.btnReloadCSV, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
 
@@ -278,8 +279,8 @@ class MainFrame(wx.Frame):
         
         label = wx.StaticText(self.csvPage, -1, "Encoding:")
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
-        self.cmbEncoding = wx.Choice(parent=self.csvPage, choices=[], id=-1, name=u'cmbEncoding', size=wx.Size(75, 21), style=0)
-        self.cmbEncoding.SetToolTipString(u'Encoding used to read CSV file')        
+        self.cmbEncoding = wx.Choice(parent=self.csvPage, choices=[], id=-1, name='cmbEncoding', size=wx.Size(75, 21), style=0)
+        self.cmbEncoding.SetToolTip('Encoding used to read CSV file')        
         box.Add(self.cmbEncoding, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
 
         for encoding in self.encodingOptions:
@@ -288,15 +289,15 @@ class MainFrame(wx.Frame):
         self.CsvSizer.Add(self.columnsGrid, 1, wx.EXPAND)
 
         label = wx.StaticText(id=-1,
-              label=u'Row filter:', name='staticText6',
+              label='Row filter:', name='staticText6',
               parent=self.csvPage, pos=wx.Point(753, 31),
               size=wx.Size(77, 13), style=wx.ALIGN_RIGHT)
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
         self.txtRowFilter = wx.TextCtrl(id=-1,
-              name=u'txtRowFilter', parent=self.csvPage,
-              pos=wx.Point(830, 27), size=wx.Size(158, 21), style=0, value=u'')
-        self.txtRowFilter.SetHelpText(u'Restrict rows to be processed (e.g. "1,3,5-9,4")')
-        self.txtRowFilter.SetToolTipString(u'Restrict rows in the CSV to be processed (e.g. "2,3,7-12,4,1")')
+              name='txtRowFilter', parent=self.csvPage,
+              pos=wx.Point(830, 27), size=wx.Size(158, 21), style=0, value='')
+        self.txtRowFilter.SetHelpText('Restrict rows to be processed (e.g. "1,3,5-9,4")')
+        self.txtRowFilter.SetToolTip('Restrict rows in the CSV to be processed (e.g. "2,3,7-12,4,1")')
         box.Add(self.txtRowFilter, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2)
 
         # options page
@@ -310,142 +311,142 @@ class MainFrame(wx.Frame):
         box = wx.BoxSizer(wx.HORIZONTAL)
         label = wx.StaticText(self.optionsPage, -1, "Use following base path for attachments (path to CSV directory used if left blank):")
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.LEFT|wx.TOP, padding + 2)
-        self.optionsSizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)
+        self.optionsSizer.Add(box, 0, wx.GROW|wx.ALL, 1)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         self.txtAttachmentsBasepath = wx.TextCtrl(self.optionsPage, -1, "", size=wx.Size(400,-1))
         box.Add(self.txtAttachmentsBasepath, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)
         btnBrowseBasePath = wx.Button(id=-1,
-              label=u'Browse...', name=u'btnBrowseBasePath',
+              label='Browse...', name='btnBrowseBasePath',
               parent=self.optionsPage, size=wx.Size(88, 23), style=0)
         box.Add(btnBrowseBasePath, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)  
         self.Bind(wx.EVT_BUTTON, self.OnBtnBrowseBasePath, btnBrowseBasePath)
-        self.optionsSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)        
+        self.optionsSizer.Add(box, 0, wx.ALL, 1)        
         
         self.chkSaveAsDraft = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Create new items and item versions in draft status (override DRAFT command)', name=u'chkSaveAsDraft', style=0)
+              label='Create new items and item versions in draft status (override DRAFT command)', name='chkSaveAsDraft', style=0)
         self.chkSaveAsDraft.SetValue(False)
-        self.chkSaveAsDraft.SetToolTipString(u'Create new items and new item versions in draft status (overrides DRAFT command option)')        
-        self.optionsSizer.Add(self.chkSaveAsDraft, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)    
+        self.chkSaveAsDraft.SetToolTip('Create new items and new item versions in draft status (overrides DRAFT command option)')        
+        self.optionsSizer.Add(self.chkSaveAsDraft, 0, wx.ALL, padding)    
 
         self.chkSaveTestXml = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Save test XML', name=u'chkSaveTestXml', style=0)
+              label='Save test XML', name='chkSaveTestXml', style=0)
         self.chkSaveTestXml.SetValue(False)
-        self.chkSaveTestXml.SetToolTipString(u'Output example XML files of item metadata from test imports')        
-        self.optionsSizer.Add(self.chkSaveTestXml, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
+        self.chkSaveTestXml.SetToolTip('Output example XML files of item metadata from test imports')        
+        self.optionsSizer.Add(self.chkSaveTestXml, 0, wx.ALL, padding)
         
         line = wx.StaticLine(self.optionsPage, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
-        self.optionsSizer.Add(line, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.TOP, padding) 
+        self.optionsSizer.Add(line, 0, wx.GROW|wx.RIGHT|wx.TOP, padding) 
 
         box = wx.BoxSizer(wx.HORIZONTAL)
         label = wx.StaticText(self.optionsPage, -1, "When updating existing items:", size=(300, -1))
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
-        self.optionsSizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.TOP, padding)
+        self.optionsSizer.Add(box, 0, wx.GROW|wx.TOP, padding)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
-        self.optionsSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
+        self.optionsSizer.Add(box, 0, wx.ALL, padding)
 
         self.cmbExistingMetadataMode = wx.Choice(choices=[],
-              id=-1, name=u'cmbExistingMetadataMode',
+              id=-1, name='cmbExistingMetadataMode',
               parent=self.optionsPage, size=wx.Size(210, 21), style=0)
         self.cmbExistingMetadataMode.Append("Clear all existing metadata")
         self.cmbExistingMetadataMode.Append("Replace only specified metadata")
         self.cmbExistingMetadataMode.Append("Append to existing metadata")
         self.cmbExistingMetadataMode.SetSelection(0)
         label = wx.StaticText(self.optionsPage, -1, "Existing Metadata:", size=(-1, -1), style=wx.ALIGN_RIGHT)
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        box.AddSpacer(indentWidth)
         box.Add(label, 0, wx.ALIGN_TOP|wx.ALL, padding)
         box.Add(self.cmbExistingMetadataMode, 1, wx.TOP|wx.ALL, padding)
 
         self.chkAppendAttachments = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Append Attachments', name=u'chkAppendAttachments', style=0)
+              label='Append Attachments', name='chkAppendAttachments', style=0)
         self.chkAppendAttachments.SetValue(False)
-        self.chkAppendAttachments.SetToolTipString(u'Leave attachments of existing items untouched and append specified attachments')        
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        self.chkAppendAttachments.SetToolTip('Leave attachments of existing items untouched and append specified attachments')        
+        box.AddSpacer(indentWidth)
         box.Add(self.chkAppendAttachments, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 0)
         
         self.chkCreateNewVersions = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Create new versions', name=u'chkCreateNewVersions', style=0)
+              label='Create new versions', name='chkCreateNewVersions', style=0)
         self.chkCreateNewVersions.SetValue(False)
-        self.chkCreateNewVersions.SetToolTipString(u'When updating existing items create new versions (overrides VERSION command option)')        
+        self.chkCreateNewVersions.SetToolTip('When updating existing items create new versions (overrides VERSION command option)')        
         box.Add(self.chkCreateNewVersions, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
 
         line = wx.StaticLine(self.optionsPage, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
-        self.optionsSizer.Add(line, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.TOP, padding)
+        self.optionsSizer.Add(line, 0, wx.GROW|wx.RIGHT|wx.TOP, padding)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         label = wx.StaticText(self.optionsPage, -1, "When specifying owners and collaborators:", size=(300, -1))
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
-        self.optionsSizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.TOP, padding)        
+        self.optionsSizer.Add(box, 0, wx.GROW|wx.TOP, padding)        
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         self.chkUseEBIUsername = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Ignore owners that do not exist', name=u'chkUseEBIUsername',
+              label='Ignore owners that do not exist', name='chkUseEBIUsername',
               style=0)
         self.chkUseEBIUsername.SetValue(False)
-        self.chkUseEBIUsername.SetToolTipString(u'Ignore owners that do not exist (for \'Owner\' column datatype)')        
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        self.chkUseEBIUsername.SetToolTip('Ignore owners that do not exist (for \'Owner\' column datatype)')        
+        box.AddSpacer(indentWidth)
         box.Add(self.chkUseEBIUsername, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
         self.chkIgnoreNonexistentCollaborators = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Ignore collaborators that do not exist', name=u'chkIgnoreNonexistentCollaborators',
+              label='Ignore collaborators that do not exist', name='chkIgnoreNonexistentCollaborators',
               style=0)
         self.chkIgnoreNonexistentCollaborators.SetValue(False)
-        self.chkIgnoreNonexistentCollaborators.SetToolTipString(u'Save item even if a specified collaborator does not exist')        
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        self.chkIgnoreNonexistentCollaborators.SetToolTip('Save item even if a specified collaborator does not exist')        
+        box.AddSpacer(indentWidth)
         box.Add(self.chkIgnoreNonexistentCollaborators, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
-        self.optionsSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
+        self.optionsSizer.Add(box, 0, wx.ALL, padding)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         self.chkSaveNonexistentUsernamesAsIDs = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Save usernames that are not internal users as user IDs (for LDAP users)', name=u'chkSaveNonexistentUsernamesAsIDs',
+              label='Save usernames that are not internal users as user IDs (for LDAP users)', name='chkSaveNonexistentUsernamesAsIDs',
               style=0)
         self.chkSaveNonexistentUsernamesAsIDs.SetValue(False)
-        self.chkSaveNonexistentUsernamesAsIDs.SetToolTipString(u'Save usernames that are not internal users as user IDs (for LDAP users)')        
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        self.chkSaveNonexistentUsernamesAsIDs.SetToolTip('Save usernames that are not internal users as user IDs (for LDAP users)')        
+        box.AddSpacer(indentWidth)
         box.Add(self.chkSaveNonexistentUsernamesAsIDs, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
-        self.optionsSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)        
+        self.optionsSizer.Add(box, 0, wx.ALL, padding)        
         
         line = wx.StaticLine(self.optionsPage, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
-        self.optionsSizer.Add(line, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.TOP, padding)        
+        self.optionsSizer.Add(line, 0, wx.GROW|wx.RIGHT|wx.TOP, padding)        
 
-        gridSizer = wx.FlexGridSizer(1, 2)
+        gridSizer = wx.FlexGridSizer(cols=2, vgap=0, hgap=0)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         label = wx.StaticText(self.optionsPage, -1, "Export:", size=(300, -1))
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)
-        gridSizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.TOP, padding)
+        gridSizer.Add(box, 0, wx.GROW|wx.TOP, padding)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         label = wx.StaticText(self.optionsPage, -1, "WHERE clause:", size=(300, -1))
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 0)
-        gridSizer.Add(box, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.TOP, 0)
+        gridSizer.Add(box, 0, wx.GROW|wx.TOP, 0)
         
         leftBox = wx.BoxSizer(wx.VERTICAL)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         self.chkExport = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Export items as CSV', name=u'chkExport',
+              label='Export items as CSV', name='chkExport',
               style=0)
         self.chkExport.SetValue(False)
-        self.chkExport.SetToolTipString(u'Export items as CSV')        
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        self.chkExport.SetToolTip('Export items as CSV')        
+        box.AddSpacer(indentWidth)
         box.Add(self.chkExport, 1, wx.ALIGN_TOP|wx.ALL, padding)
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        box.AddSpacer(indentWidth)
         self.chkIncludeNonLive = wx.CheckBox(parent=self.optionsPage, id=-1,
-              label=u'Include non-live items', name=u'chkIncludeNonLive', style=0)
+              label='Include non-live items', name='chkIncludeNonLive', style=0)
         self.chkIncludeNonLive.SetValue(False)
-        self.chkIncludeNonLive.SetToolTipString(u'Include non-live items in export (e.g. archived items)')        
+        self.chkIncludeNonLive.SetToolTip('Include non-live items in export (e.g. archived items)')        
         box.Add(self.chkIncludeNonLive, 1, wx.ALIGN_TOP|wx.ALL, padding)
         
         
         leftBox.Add(box)
         
         box = wx.BoxSizer(wx.HORIZONTAL)
-        box.AddSpacer(wx.Size(indentWidth, -1), border=0, flag=0)
+        box.AddSpacer(indentWidth)
         label = wx.StaticText(self.optionsPage, -1, "Filename Conflicts:", size=(-1, -1), style=wx.ALIGN_RIGHT)
         box.Add(label, 0, wx.ALIGN_TOP|wx.ALL, padding)
         self.cmbConflicts = wx.Choice(choices=[],
-              id=-1, name=u'cmbConflicts',
+              id=-1, name='cmbConflicts',
               parent=self.optionsPage, size=wx.Size(250, 21), style=0)
         box.Add(self.cmbConflicts, 1, wx.TOP|wx.ALL, padding)
         leftBox.Add(box, 0, wx.ALIGN_TOP|wx.ALL, padding)
@@ -459,7 +460,7 @@ class MainFrame(wx.Frame):
         
         box = wx.BoxSizer(wx.HORIZONTAL)
         self.txtWhereClause = wx.TextCtrl(self.optionsPage, -1, "", size=wx.Size(420, 50), style=wx.TE_MULTILINE)
-        font = wx.Font(10, wx.MODERN, wx.NORMAL, wx.NORMAL, False, u'Courier New')
+        font = wx.Font(10, wx.MODERN, wx.NORMAL, wx.NORMAL, False, 'Courier New')
         self.txtWhereClause.SetFont(font)
         box.Add(self.txtWhereClause, 1, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)
         gridSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 0)
@@ -467,35 +468,35 @@ class MainFrame(wx.Frame):
         self.optionsSizer.Add(gridSizer)
 
         line = wx.StaticLine(self.optionsPage, -1, size=(20,-1), style=wx.LI_HORIZONTAL)
-        self.optionsSizer.Add(line, 0, wx.GROW|wx.ALIGN_CENTER_VERTICAL|wx.RIGHT|wx.BOTTOM|wx.TOP, 5)
+        self.optionsSizer.Add(line, 0, wx.GROW|wx.RIGHT|wx.BOTTOM|wx.TOP, 5)
         
         # options page Expert script buttons
         box = wx.BoxSizer(wx.HORIZONTAL)
         label = wx.StaticText(self.optionsPage, -1, "Expert Scripts:", size=(-1, -1))
         box.Add(label, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, padding)        
-        self.optionsSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)
+        self.optionsSizer.Add(box, 0, wx.ALL, 1)
         box = wx.BoxSizer(wx.HORIZONTAL)
         self.btnStartScript = wx.Button(id=-1,
-              label=u'Start Script', name=u'btnStartScript',
+              label='Start Script', name='btnStartScript',
               parent=self.optionsPage, size=wx.Size(132, 23), style=0)
         box.Add(self.btnStartScript, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)  
         self.Bind(wx.EVT_BUTTON, self.OnBtnStartScript, self.btnStartScript)        
         self.btnPreScript = wx.Button(id=-1,
-              label=u'Row Pre-Script', name=u'btnPreScript',
+              label='Row Pre-Script', name='btnPreScript',
               parent=self.optionsPage, size=wx.Size(132, 23), style=0)
         box.Add(self.btnPreScript, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)  
         self.Bind(wx.EVT_BUTTON, self.OnBtnPreScript, self.btnPreScript)
         self.btnPostScript = wx.Button(id=-1,
-              label=u'Row Post-Script', name=u'btnPostScript',
+              label='Row Post-Script', name='btnPostScript',
               parent=self.optionsPage, size=wx.Size(132, 23), style=0)
         box.Add(self.btnPostScript, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)  
         self.Bind(wx.EVT_BUTTON, self.OnBtnPostScript, self.btnPostScript)
         self.btnEndScript = wx.Button(id=-1,
-              label=u'End Script', name=u'btnEndScript',
+              label='End Script', name='btnEndScript',
               parent=self.optionsPage, size=wx.Size(132, 23), style=0)
         box.Add(self.btnEndScript, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)  
         self.Bind(wx.EVT_BUTTON, self.OnBtnEndScript, self.btnEndScript)  
-        self.optionsSizer.Add(box, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 1)
+        self.optionsSizer.Add(box, 0, wx.ALL, 1)
         
         self.updateScriptButtonsLabels() 
                 
@@ -505,7 +506,7 @@ class MainFrame(wx.Frame):
 
         box = wx.BoxSizer(orient=wx.HORIZONTAL)
         self.btnClearLog = wx.Button(id=-1, label="Clear", parent=self.logPage, size=wx.Size(90, 23), style=0)
-        self.btnClearLog.SetToolTipString("Clear log")
+        self.btnClearLog.SetToolTip("Clear log")
         self.btnClearLog.Bind(wx.EVT_BUTTON, self.OnBtnClearLog)
         box.Add(self.btnClearLog, 0, wx.ALIGN_CENTER_VERTICAL|wx.ALL, 4)
         sizer.Add(box)
@@ -525,45 +526,45 @@ class MainFrame(wx.Frame):
         tooltipTest = "Perform a test run (no items saved in EQUELLA)"
         
         self.btnConnStartImport = wx.Button(id=-1, label=labelStart, parent=self.connectionPage, pos=wx.Point(left + width + gap, top), size=wx.Size(width, height), style=0)
-        self.btnConnStartImport.SetToolTipString(tooltopStart)
+        self.btnConnStartImport.SetToolTip(tooltopStart)
         self.btnConnStartImport.Bind(wx.EVT_BUTTON, self.OnBtnStartImportButton)
 
         self.btnConnTestImport = wx.Button(id=-1, label=labelTest, parent=self.connectionPage, pos=wx.Point(left, top), size=wx.Size(width, height), style=0)
-        self.btnConnTestImport.SetToolTipString(tooltipTest)
+        self.btnConnTestImport.SetToolTip(tooltipTest)
         self.btnConnTestImport.Bind(wx.EVT_BUTTON, self.OnBtnTestImportButton)
 
         self.btnCsvStartImport = wx.Button(id=-1, label=labelStart, parent=self.csvPage, pos=wx.Point(left + width + gap, top), size=wx.Size(width, height), style=0)
-        self.btnCsvStartImport.SetToolTipString(tooltopStart)
+        self.btnCsvStartImport.SetToolTip(tooltopStart)
         self.btnCsvStartImport.Bind(wx.EVT_BUTTON, self.OnBtnStartImportButton)
 
         self.btnCsvTestImport = wx.Button(id=-1, label=labelTest, parent=self.csvPage, pos=wx.Point(left, top), size=wx.Size(width, height), style=0)
-        self.btnCsvTestImport.SetToolTipString(tooltipTest)
+        self.btnCsvTestImport.SetToolTip(tooltipTest)
         self.btnCsvTestImport.Bind(wx.EVT_BUTTON, self.OnBtnTestImportButton)
 
         self.btnOptionsStartImport = wx.Button(id=-1, label=labelStart, parent=self.optionsPage, pos=wx.Point(left + width + gap, top), size=wx.Size(width, height), style=0)
-        self.btnOptionsStartImport.SetToolTipString(tooltopStart)
+        self.btnOptionsStartImport.SetToolTip(tooltopStart)
         self.btnOptionsStartImport.Bind(wx.EVT_BUTTON, self.OnBtnStartImportButton)
 
         self.btnOptionsTestImport = wx.Button(id=-1, label=labelTest, parent=self.optionsPage, pos=wx.Point(left, top), size=wx.Size(width, height), style=0)
-        self.btnOptionsTestImport.SetToolTipString(tooltipTest)
+        self.btnOptionsTestImport.SetToolTip(tooltipTest)
         self.btnOptionsTestImport.Bind(wx.EVT_BUTTON, self.OnBtnTestImportButton)
 
         self.btnLogStartImport = wx.Button(id=-1, label=labelStart, parent=self.logPage, pos=wx.Point(left + width + gap, top), size=wx.Size(width, height), style=0)
-        self.btnLogStartImport.SetToolTipString(tooltopStart)
+        self.btnLogStartImport.SetToolTip(tooltopStart)
         self.btnLogStartImport.Bind(wx.EVT_BUTTON, self.OnBtnStartImportButton)
 
         self.btnLogTestImport = wx.Button(id=-1, label=labelTest, parent=self.logPage, pos=wx.Point(left, top), size=wx.Size(width, height), style=0)
-        self.btnLogTestImport.SetToolTipString(tooltipTest)
+        self.btnLogTestImport.SetToolTip(tooltipTest)
         self.btnLogTestImport.Bind(wx.EVT_BUTTON, self.OnBtnTestImportButton)
 
         # toolbar and status bar
         self.mainStatusBar = wx.StatusBar(id=wxID_MAINFRAMEMAINSTATUSBAR,
-              name=u'mainStatusBar', parent=self, style=0)
-        self.mainStatusBar.SetToolTipString(u'Status Bar')
+              name='mainStatusBar', parent=self, style=0)
+        self.mainStatusBar.SetToolTip('Status Bar')
         self._init_coll_mainStatusBar_Fields(self.mainStatusBar)
 
         self.mainToolbar = wx.ToolBar(id=wxID_MAINFRAMEMAINTOOLBAR,
-              name=u'mainToolbar', parent=self, pos=wx.Point(0, 0),
+              name='mainToolbar', parent=self, pos=wx.Point(0, 0),
               size=wx.Size(1006, 27), style=wx.TB_HORIZONTAL | wx.NO_BORDER)
 
 
@@ -582,7 +583,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_TEXT, self.OnSettingChange, self.txtUsername)
         self.Bind(wx.EVT_TEXT, self.OnPasswordChange, self.txtPassword)
         self.Bind(wx.EVT_CHOICE, self.OnSettingChange, self.cmbCollections)
-        self.columnsGrid.Bind(wx.grid.EVT_GRID_CELL_CHANGE, self.OnSettingChange)
+        self.columnsGrid.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.OnSettingChange)
         self.Bind(wx.EVT_CHECKBOX, self.OnSettingChange, self.chkSaveAsDraft)
         self.Bind(wx.EVT_CHECKBOX, self.OnSettingChange, self.chkSaveTestXml)
         self.Bind(wx.EVT_CHOICE, self.OnSettingChange, self.cmbExistingMetadataMode)
@@ -666,8 +667,7 @@ class MainFrame(wx.Frame):
 
     def OnBtnBrowseBasePath(self, evt):
         dlg = wx.DirDialog(self, "Choose a folder/directory:",
-                          style=wx.DD_DEFAULT_STYLE
-                           )
+                          style=wx.DD_DEFAULT_STYLE)
         
         # set the default directory for the dialog
         dlg.SetPath(os.path.join(os.path.dirname(self.getCSVPath()), self.txtAttachmentsBasepath.GetValue().strip()))
@@ -715,7 +715,7 @@ class MainFrame(wx.Frame):
         except:
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
                   
         dlgScript.CenterOnScreen()
         dlgScript.SetTitle(title)
@@ -735,7 +735,7 @@ class MainFrame(wx.Frame):
         except:
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
             
         dlgScript.Destroy()
 
@@ -862,8 +862,8 @@ class MainFrame(wx.Frame):
         self.currentColumnHeadings = []
         
         # mouse cursors
-        self.normalCursor= wx.StockCursor(wx.CURSOR_ARROW)
-        self.waitCursor= wx.StockCursor(wx.CURSOR_WAIT)
+        self.normalCursor= wx.Cursor(wx.CURSOR_ARROW)
+        self.waitCursor= wx.Cursor(wx.CURSOR_WAIT)
 
         # main ebi engine
         self.engine = None
@@ -874,7 +874,7 @@ class MainFrame(wx.Frame):
         self.mainToolbar.EnableTool(wxID_MAINFRAMEMAINTOOLBARSTOP , False)
         self.mainToolbar.EnableTool(wxID_MAINFRAMEMAINTOOLBARPAUSE , False)
         
-        self.config = ConfigParser.ConfigParser()
+        self.config = configparser.ConfigParser()
 
         
         
@@ -1001,7 +1001,7 @@ class MainFrame(wx.Frame):
                 self.debug = self.config.getboolean('Configuration','Debug')
             except:
                 if self.debug:
-                    print str(sys.exc_info()[1])        
+                    print((str(sys.exc_info()[1])        ))
 
         self.engine.setDebug(self.debug)
         if self.debug:
@@ -1055,8 +1055,7 @@ class MainFrame(wx.Frame):
                 defaultDir=os.getcwd(), 
                 defaultFile="",
                 wildcard=wildcard,
-                style=wx.OPEN | wx.CHANGE_DIR
-                )
+                style=wx.FD_OPEN | wx.FD_CHANGE_DIR)
 
             if dlg.ShowModal() == wx.ID_OK:
                 paths = dlg.GetPaths()
@@ -1081,18 +1080,18 @@ class MainFrame(wx.Frame):
         csv_reader = csv.reader(utf8_data, dialect=dialect, **kwargs)
         firstRow = True
         for row in csv_reader:
-            # remove BOM for utf-8
+            # remove BOM for utf-8 (Python 3: strings already decoded)
             if firstRow:
-                if row[0].startswith(codecs.BOM_UTF8):
-                    row[0] = row[0].decode("utf-8")[1:]
+                if len(row) > 0 and row[0] and row[0].startswith('\ufeff'):  # BOM as Unicode char
+                    row[0] = row[0][1:]
                 firstRow = False
 
-            yield [cell.decode(encoding) for cell in row]
+            yield row  # Python 3: csv.reader already returns strings
     
     def LoadCSV(self):
         self.mainStatusBar.SetStatusText("Loading CSV...", 0)
         
-        reader = self.unicode_csv_reader(open(self.getCSVPath(), "rbU"), self.cmbEncoding.GetStringSelection())
+        reader = self.unicode_csv_reader(open(self.getCSVPath(), "r", encoding=self.cmbEncoding.GetStringSelection(), newline=''), self.cmbEncoding.GetStringSelection())
         
         # store the rows of the CSV in an array
         csvArray = []
@@ -1108,7 +1107,7 @@ class MainFrame(wx.Frame):
         
     def verifyCurrentColumnsMatchCSV(self):
         if self.txtCSVPath.GetValue() != "" and not os.path.isdir(self.txtCSVPath.GetValue()):
-            reader = self.unicode_csv_reader(open(self.getCSVPath(), "rbU"), self.cmbEncoding.GetStringSelection())
+            reader = self.unicode_csv_reader(open(self.getCSVPath(), "r", encoding=self.cmbEncoding.GetStringSelection(), newline=''), self.cmbEncoding.GetStringSelection())
             
             # store the first row of the CSV in an array
             csvHeadings = []
@@ -1123,7 +1122,7 @@ class MainFrame(wx.Frame):
             # check if all CSV headings match grid headings
             i = 0
             for columnHeading in csvHeadings:
-                if columnHeading.encode(self.cmbEncoding.GetStringSelection()).strip() != self.columnsGrid.GetCellValue(i, 1).encode(self.cmbEncoding.GetStringSelection()):
+                if columnHeading.strip() != self.columnsGrid.GetCellValue(i, 1).strip():
                     return False
                 i += 1
 
@@ -1189,46 +1188,16 @@ class MainFrame(wx.Frame):
         while dividend > 0:
             modulo = (dividend - 1) % 26
             columnName = chr(65 + modulo) + columnName
-            dividend = (dividend - modulo) / 26
+            dividend = (dividend - modulo) // 26
 
         return columnName
 
     def LoadColumns(self, csvArray):
         self.MemorizeColumnSettings()
         
-        # delete all grid rows
+        # Delete all grid rows
         if self.columnsGrid.GetNumberRows() > 0:
-            self.columnsGrid.DeleteRows(0, self.columnsGrid.GetNumberRows())
-
-        # set cell editors
-        booleanCellEditor = wx.grid.GridCellBoolEditor()
-        
-        # try-except for some distros of linux that do not support UseStringValues()
-        try:
-            booleanCellEditor.UseStringValues("YES", "")        
-        except:
-            pass
-        columnDataTypesCellEditor = wx.grid.GridCellChoiceEditor([self.METADATA,
-                                                                  self.ATTACHMENTLOCATIONS,
-                                                                  self.ATTACHMENTNAMES,
-                                                                  self.CUSTOMATTACHMENTS,
-                                                                  self.RAWFILES,
-                                                                  self.URLS,
-                                                                  self.HYPERLINKNAMES,
-                                                                  self.EQUELLARESOURCES,
-                                                                  self.EQUELLARESOURCENAMES,
-                                                                  self.COMMANDS,
-                                                                  self.TARGETIDENTIFIER,
-                                                                  self.TARGETVERSION,
-                                                                  self.COLLECTION,
-                                                                  self.OWNER,
-                                                                  self.COLLABORATORS,
-                                                                  self.ITEMID,
-                                                                  self.ITEMVERSION,
-                                                                  self.THUMBNAILS,
-                                                                  self.SELECTEDTHUMBNAIL,
-                                                                  self.ROWERROR,
-                                                                  self.IGNORE], False)        
+            self.columnsGrid.DeleteRows(0, self.columnsGrid.GetNumberRows())        
         
         # iterate through columns in CSV
         row = 0
@@ -1273,10 +1242,58 @@ class MainFrame(wx.Frame):
             self.columnsGrid.SetCellAlignment(row, 6, wx.ALIGN_CENTER, wx.ALIGN_CENTER)
             
             # set cell editors (drop-downs)
-            self.columnsGrid.SetCellEditor(row, 2, columnDataTypesCellEditor)
-            self.columnsGrid.SetCellEditor(row, 3, booleanCellEditor)
-            self.columnsGrid.SetCellEditor(row, 4, booleanCellEditor)
-            self.columnsGrid.SetCellEditor(row, 5, booleanCellEditor)
+            # Use grid attributes to manage editors safely
+            attr2 = wx.grid.GridCellAttr()
+            attr2.SetEditor(wx.grid.GridCellChoiceEditor([self.METADATA,
+                                                          self.ATTACHMENTLOCATIONS,
+                                                          self.ATTACHMENTNAMES,
+                                                          self.CUSTOMATTACHMENTS,
+                                                          self.RAWFILES,
+                                                          self.URLS,
+                                                          self.HYPERLINKNAMES,
+                                                          self.EQUELLARESOURCES,
+                                                          self.EQUELLARESOURCENAMES,
+                                                          self.COMMANDS,
+                                                          self.TARGETIDENTIFIER,
+                                                          self.TARGETVERSION,
+                                                          self.COLLECTION,
+                                                          self.OWNER,
+                                                          self.COLLABORATORS,
+                                                          self.ITEMID,
+                                                          self.ITEMVERSION,
+                                                          self.THUMBNAILS,
+                                                          self.SELECTEDTHUMBNAIL,
+                                                          self.ROWERROR,
+                                                          self.IGNORE], False))
+            self.columnsGrid.SetAttr(row, 2, attr2)
+            
+            # Boolean editors for columns 3, 4, 5
+            attr3 = wx.grid.GridCellAttr()
+            boolEditor3 = wx.grid.GridCellBoolEditor()
+            try:
+                boolEditor3.UseStringValues("YES", "")
+            except:
+                pass
+            attr3.SetEditor(boolEditor3)
+            self.columnsGrid.SetAttr(row, 3, attr3)
+            
+            attr4 = wx.grid.GridCellAttr()
+            boolEditor4 = wx.grid.GridCellBoolEditor()
+            try:
+                boolEditor4.UseStringValues("YES", "")
+            except:
+                pass
+            attr4.SetEditor(boolEditor4)
+            self.columnsGrid.SetAttr(row, 4, attr4)
+            
+            attr5 = wx.grid.GridCellAttr()
+            boolEditor5 = wx.grid.GridCellBoolEditor()
+            try:
+                boolEditor5.UseStringValues("YES", "")
+            except:
+                pass
+            attr5.SetEditor(boolEditor5)
+            self.columnsGrid.SetAttr(row, 5, attr5)
             
             self.setCellStates(row)
             
@@ -1392,7 +1409,7 @@ class MainFrame(wx.Frame):
         i = 0
         while i < len(cm):
             try:
-                message = message + chr(int(cm[i:i + 3]) + i/3 + 1)
+                message = message + chr(int(cm[i:i + 3]) + i//3 + 1)
             except:
                 break
             i = i + 3
@@ -1591,7 +1608,7 @@ class MainFrame(wx.Frame):
         except:
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
                     
         itemSaved = False
         filenameSelected = False
@@ -1609,14 +1626,14 @@ class MainFrame(wx.Frame):
                                 defaultDir=openDir,
                                 defaultFile=defaultFilename,
                                 wildcard="EBI settings file (*.ebi)|*.ebi",
-                                style=wx.SAVE|wx.FD_OVERWRITE_PROMPT)
+                                style=wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
             except:
                 # catch error caused by Ubuntu wxPython lack of support for wx.FD_OVERWRITE_PROMPT
                 dlg = wx.FileDialog(self, message="Save settings",
                                 defaultDir=openDir,
                                 defaultFile=defaultFilename,
                                 wildcard="EBI settings file (*.ebi)|*.ebi",
-                                style=wx.SAVE)
+                                style=wx.FD_SAVE)
             if dlg.ShowModal() == wx.ID_OK:
                 filenameSelected = True
                 path = dlg.GetPath()
@@ -1633,8 +1650,9 @@ class MainFrame(wx.Frame):
                 path += ".ebi"
             
             # save settings file as utf-8
-            fp = file(path, 'w')
-            fp.write(settingsDoc.toxml("utf-8"))
+            # toprettyxml with encoding returns bytes, decode to string for text mode
+            fp = open(path, 'w', encoding='utf-8')
+            fp.write(settingsDoc.toprettyxml(encoding='utf-8').decode('utf-8'))
             fp.close()
             
             self.settingsFile = path
@@ -1652,7 +1670,7 @@ class MainFrame(wx.Frame):
             except:
                 if self.debug:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                    self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
         time.sleep(0.25)
         self.SetCursor(self.normalCursor)                            
 
@@ -1670,14 +1688,11 @@ class MainFrame(wx.Frame):
             self.settingsfile = path
             
             # open settings file as utf-8
-            fp = codecs.open(path, 'r', 'utf-8')
+            fp = codecs.open(path, 'r', 'utf-8-sig')  # utf-8-sig automatically handles BOM
             settingsString = fp.read()
             fp.close()
             
-            # Strip the BOM from the beginning of the Unicode string, if it exists
-            if settingsString[0] == unicode( codecs.BOM_UTF8, "utf-8" ):
-                settingsString.lstrip( unicode( codecs.BOM_UTF8, "utf-8" ) )
-            
+            # Python 3: parseString expects bytes, so encode the string
             settingsDoc = parseString(settingsString.encode('utf-8'))
 
             # set connection fields
@@ -1705,40 +1720,6 @@ class MainFrame(wx.Frame):
 
             # delete all rows
             if self.columnsGrid.GetNumberRows() > 0:
-                self.columnsGrid.DeleteRows(0, self.columnsGrid.GetNumberRows())
-
-            # set cell editors
-            booleanCellEditor = wx.grid.GridCellBoolEditor()
-            
-            # try-except for some distros of linux that do not support UseStringValues()
-            try:
-                booleanCellEditor.UseStringValues("YES", "")        
-            except:
-                pass            
-            columnDataTypesCellEditor = wx.grid.GridCellChoiceEditor([self.METADATA,
-                                                                      self.ATTACHMENTLOCATIONS,
-                                                                      self.ATTACHMENTNAMES,
-                                                                      self.CUSTOMATTACHMENTS,
-                                                                      self.RAWFILES,
-                                                                      self.URLS,
-                                                                      self.HYPERLINKNAMES,
-                                                                      self.EQUELLARESOURCES,
-                                                                      self.EQUELLARESOURCENAMES,
-                                                                      self.COMMANDS,
-                                                                      self.TARGETIDENTIFIER,
-                                                                      self.TARGETVERSION,
-                                                                      self.COLLECTION,
-                                                                      self.OWNER,
-                                                                      self.COLLABORATORS,                                                                      
-                                                                      self.ITEMID,
-                                                                      self.ITEMVERSION,
-                                                                      self.THUMBNAILS,
-                                                                      self.SELECTEDTHUMBNAIL,
-                                                                      self.ROWERROR,
-                                                                      self.IGNORE], False)
-
-            # delete all grid rows
-            if self.columnsGrid.GetNumberRows() > 0:
                 self.columnsGrid.DeleteRows(0, self.columnsGrid.GetNumberRows())            
             
             # populate grid
@@ -1762,11 +1743,57 @@ class MainFrame(wx.Frame):
                 self.columnsGrid.SetCellAlignment(row, 5, wx.ALIGN_CENTER, wx.ALIGN_CENTER)
                 self.columnsGrid.SetCellAlignment(row, 6, wx.ALIGN_CENTER, wx.ALIGN_CENTER)                
                 
-                # set cell editors (drop-downs)
-                self.columnsGrid.SetCellEditor(row, 2, columnDataTypesCellEditor)
-                self.columnsGrid.SetCellEditor(row, 3, booleanCellEditor)
-                self.columnsGrid.SetCellEditor(row, 4, booleanCellEditor)
-                self.columnsGrid.SetCellEditor(row, 5, booleanCellEditor)
+                # set cell editors (drop-downs) using GridCellAttr
+                attr2 = wx.grid.GridCellAttr()
+                attr2.SetEditor(wx.grid.GridCellChoiceEditor([self.METADATA,
+                                                              self.ATTACHMENTLOCATIONS,
+                                                              self.ATTACHMENTNAMES,
+                                                              self.CUSTOMATTACHMENTS,
+                                                              self.RAWFILES,
+                                                              self.URLS,
+                                                              self.HYPERLINKNAMES,
+                                                              self.EQUELLARESOURCES,
+                                                              self.EQUELLARESOURCENAMES,
+                                                              self.COMMANDS,
+                                                              self.TARGETIDENTIFIER,
+                                                              self.TARGETVERSION,
+                                                              self.COLLECTION,
+                                                              self.OWNER,
+                                                              self.COLLABORATORS,
+                                                              self.ITEMID,
+                                                              self.ITEMVERSION,
+                                                              self.THUMBNAILS,
+                                                              self.SELECTEDTHUMBNAIL,
+                                                              self.ROWERROR,
+                                                              self.IGNORE], False))
+                self.columnsGrid.SetAttr(row, 2, attr2)
+                
+                attr3 = wx.grid.GridCellAttr()
+                boolEditor3 = wx.grid.GridCellBoolEditor()
+                try:
+                    boolEditor3.UseStringValues("YES", "")
+                except:
+                    pass
+                attr3.SetEditor(boolEditor3)
+                self.columnsGrid.SetAttr(row, 3, attr3)
+                
+                attr4 = wx.grid.GridCellAttr()
+                boolEditor4 = wx.grid.GridCellBoolEditor()
+                try:
+                    boolEditor4.UseStringValues("YES", "")
+                except:
+                    pass
+                attr4.SetEditor(boolEditor4)
+                self.columnsGrid.SetAttr(row, 4, attr4)
+                
+                attr5 = wx.grid.GridCellAttr()
+                boolEditor5 = wx.grid.GridCellBoolEditor()
+                try:
+                    boolEditor5.UseStringValues("YES", "")
+                except:
+                    pass
+                attr5.SetEditor(boolEditor5)
+                self.columnsGrid.SetAttr(row, 5, attr5)
                 
                 # set first two cells of each row read-only
                 self.columnsGrid.SetReadOnly(row, 0)
@@ -1930,7 +1957,7 @@ class MainFrame(wx.Frame):
             errorString = "ERROR opening settings file: " + err
             exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
             if self.debug:
-                errorString += ': ' + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                errorString += ': ' + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
             self.engine.echo(errorString, log=False, style=2)
             self.mainStatusBar.SetStatusText("Ready", 0)
             return False
@@ -1951,7 +1978,7 @@ class MainFrame(wx.Frame):
             except:
                 if self.debug:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                    self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
 
             # open settings file
             dlg = wx.FileDialog(
@@ -1959,8 +1986,7 @@ class MainFrame(wx.Frame):
                 defaultDir=openDir, 
                 defaultFile="",
                 wildcard="EBI settings file (*.ebi)|*.ebi",
-                style=wx.OPEN | wx.CHANGE_DIR
-                )
+                style=wx.FD_OPEN | wx.FD_CHANGE_DIR)
 
             if dlg.ShowModal() == wx.ID_OK:
                 if not self.loadSettings(dlg.GetPaths()[0]):
@@ -1977,7 +2003,7 @@ class MainFrame(wx.Frame):
                 except:
                     if self.debug:
                         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                        self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                        self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
                 
             dlg.Destroy()
 
@@ -2022,19 +2048,19 @@ class MainFrame(wx.Frame):
                     if not "Configuration" in self.config.sections():
                         self.config.add_section('Configuration')
                         
-                    self.config.set('Configuration','loadlastsettingsfile', str(dlg.chkLoadLastSettingsFile.GetValue()))
+                    self.config.set('Configuration','loadlastsettingsfile', str(dlg.chkLoadLastSettingsFile.GetValue()).lower())
 
-                    self.config.set('Configuration','debug', str(dlg.chkDebugMode.GetValue()))
+                    self.config.set('Configuration','debug', str(dlg.chkDebugMode.GetValue()).lower())
                     self.debug = dlg.chkDebugMode.GetValue()
                     self.engine.debug = dlg.chkDebugMode.GetValue()
                     
-                    self.config.set('Configuration','clearlogeachrun', str(dlg.chkClearLogEachRun.GetValue()))
+                    self.config.set('Configuration','clearlogeachrun', str(dlg.chkClearLogEachRun.GetValue()).lower())
                     self.clearLogEachRun = dlg.chkClearLogEachRun.GetValue()
 
-                    self.config.set('Configuration','savepassword', str(dlg.chkSavePassword.GetValue()))
+                    self.config.set('Configuration','savepassword', str(dlg.chkSavePassword.GetValue()).lower())
                     self.savePassword = dlg.chkSavePassword.GetValue()
                     
-                    self.config.set('Configuration','networklogging', str(dlg.chkNetworkLogging.GetValue()))
+                    self.config.set('Configuration','networklogging', str(dlg.chkNetworkLogging.GetValue()).lower())
                     self.engine.networkLogging = dlg.chkNetworkLogging.GetValue()
 
                     if dlg.txtAttachmentsChunkSize.GetValue().strip() == "":
@@ -2071,7 +2097,7 @@ class MainFrame(wx.Frame):
                 except:
                     if self.debug:
                         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                        self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)               
+                        self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)               
                 
             dlg.Destroy()
 
@@ -2083,17 +2109,17 @@ class MainFrame(wx.Frame):
                 ebiVersion = ""
                 if self.engine.proxy != "":
                     
-                    password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+                    password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
                     password_mgr.add_password(None, self.engine.proxy, self.engine.proxyUsername, self.engine.proxyPassword)
-                    proxy_auth_handler = urllib2.ProxyBasicAuthHandler(password_mgr)
-                    proxy_handler = urllib2.ProxyHandler({"http": self.engine.proxy})
+                    proxy_auth_handler = urllib.request.ProxyBasicAuthHandler(password_mgr)
+                    proxy_handler = urllib.request.ProxyHandler({"http": self.engine.proxy})
                         
                     # build URL opener with proxy
-                    opener = urllib2.build_opener(proxy_handler, proxy_auth_handler)                    
+                    opener = urllib.request.build_opener(proxy_handler, proxy_auth_handler)                    
                     
                     f = opener.open(self.EBIDownloadPage + "<XML>")
                 else:
-                    f = urllib2.urlopen(self.EBIDownloadPage + "<XML>")
+                    f = urllib.request.urlopen(self.EBIDownloadPage + "<XML>")
                     
                 itemXml = PropBagEx(parseString(f.read()))
                 itemTitle = itemXml.getNode("xml/item/itembody/name").strip()
@@ -2101,7 +2127,7 @@ class MainFrame(wx.Frame):
             except:
                 if self.debug:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                    self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
             
             self.SetCursor(self.normalCursor)
             
@@ -2111,7 +2137,7 @@ class MainFrame(wx.Frame):
                 latestVersionText = "\n(latest version is %s)" % ebiVersion
             
             # about dialog
-            info = wx.AboutDialogInfo()
+            info = wx.adv.AboutDialogInfo()
             info.Name = "EQUELLA(R) Bulk Importer"
             info.Version = self.version + latestVersionText
             info.Copyright = self.copyright
@@ -2125,7 +2151,7 @@ class MainFrame(wx.Frame):
             info.License = self.license
 
             # display about box
-            wx.AboutBox(info)
+            wx.adv.AboutBox(info)
             
     def populateCollectionsDropDown(self, collectionsList):
         selectedCollection = self.cmbCollections.GetStringSelection()
@@ -2147,7 +2173,7 @@ class MainFrame(wx.Frame):
         self.mainStatusBar.SetStatusText("Connecting...", 0)
         try:
             if self.txtInstitutionUrl.GetValue().strip() == "":
-                raise Exception, "No insitution URL provided"
+                raise Exception("No insitution URL provided")
         
             # read current connection parameters
             self.loadCurrentSettings()
@@ -2176,7 +2202,7 @@ class MainFrame(wx.Frame):
             # form error string for debugging
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                self.engine.echo("".join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                self.engine.echo("".join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
                             
             dlg.ShowModal()
             dlg.Destroy()
@@ -2254,21 +2280,16 @@ class MainFrame(wx.Frame):
             self.progressGauge.Hide()
             
             if self.txtInstitutionUrl.GetValue().strip() == "":
-                raise Exception, "No institution URL provided"
-            
+                raise Exception("No institution URL provided")
             if self.cmbCollections.GetStringSelection() == "<No collections>" or self.cmbCollections.GetStringSelection() == "<Please select>":
                 try:
                     self.loadCurrentSettings()
                     self.populateCollectionsDropDown(sorted(self.engine.getContributableCollections()))            
                 except:
                     pass
-                raise Exception, "No collection selected"
-            
+                raise Exception("No collection selected")
             if self.getCSVPath() == "":
-                raise Exception, "No CSV selected"
-            
-
-
+                raise Exception("No CSV selected")
             # clear log if required
             if self.clearLogEachRun:
                 self.ClearLog()
@@ -2284,7 +2305,7 @@ class MainFrame(wx.Frame):
                 # read current connection parameters and run import
                 self.loadCurrentSettings()
                 
-                # print preferences
+                # print(preferences)
                 self.printNonDefaultPreferences()
                 
                 # perform run
@@ -2322,7 +2343,7 @@ class MainFrame(wx.Frame):
             exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
             errorString = "ERROR: " + str(exceptionValue)
             if self.debug:
-                errorString += ': ' + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                errorString += ': ' + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
             self.engine.echo(errorString, log=False, style=2)
             self.enableControls()
             self.mainToolbar.EnableTool(wxID_MAINFRAMEMAINTOOLBARSTOP, False)
@@ -2338,7 +2359,7 @@ class MainFrame(wx.Frame):
         except:
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                self.engine.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
+                self.engine.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), log=False, style=2)
                     
         if self.dirtyUI:
             dlg = wx.MessageDialog(self,
@@ -2347,14 +2368,22 @@ class MainFrame(wx.Frame):
                 wx.YES|wx.NO|wx.CANCEL|wx.ICON_EXCLAMATION)
             result = dlg.ShowModal()
             dlg.Destroy()
-            if result == wx.ID_NO:
-                self.Destroy()
+            if result == wx.ID_CANCEL:
+                event.Veto()
+                return
             if result == wx.ID_YES:
                 # save settings
-                if self.saveSettings(True):
-                    self.Destroy()
-        else:
-            self.Destroy()
+                if not self.saveSettings(True):
+                    event.Veto()
+                    return
+        
+        # Clean up to prevent bus error on macOS
+        try:
+            self.SetCursor(wx.NullCursor)
+        except:
+            pass
+        
+        event.Skip()
         
 class Log(stc.StyledTextCtrl):
     def __init__(self, parent, ID=-1, pos=wx.DefaultPosition, size=wx.DefaultSize, style=0):
@@ -2388,9 +2417,12 @@ class Log(stc.StyledTextCtrl):
         
     def AddLogText(self, text, style = 0):
         self.SetReadOnly(False)
-        self.AppendText(text.decode(self.parent.owner.cmbEncoding.GetStringSelection()))
+        # Python 3: decode only if bytes, otherwise use as-is
+        if isinstance(text, bytes):
+            text = text.decode(self.parent.owner.cmbEncoding.GetStringSelection())
+        self.AppendText(text)
         if style != 0:
-            self.StartStyling(self.GetTextLength() - len(text), 0xff)
+            self.StartStyling(self.GetTextLength() - len(text))  # wxPython 4.x: only position param
             self.SetStyling(len(text) - 1, style)
         if self.GetLineCount() > self.logBufferSize + self.logBufferChunk:
             self.SetSelection(0, self.PositionFromLine(self.GetLineCount() - self.logBufferSize))
@@ -2533,7 +2565,7 @@ class ScriptEditor(stc.StyledTextCtrl):
             
             # add extra indent if following an indent keyword
             indentKeywords = ['if ','else:','elif ','for ','while ','def ','class ','try:','except ','finally:']
-            if filter(self.GetLineRaw(line - 1).strip().startswith,indentKeywords + [''])[0] in indentKeywords:
+            if list(filter(self.GetLineRaw(line - 1).strip().startswith,indentKeywords + ['']))[0] in indentKeywords:
                 indentWidth += self.GetTabWidth()
 
             self.SetLineIndentation(line, indentWidth)

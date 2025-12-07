@@ -1,0 +1,11 @@
+# EQUELLA Bulk Importer (EBI) - Python 3 Dependencies
+# Updated for Python 3.8+
+
+# GUI framework - wxPython Phoenix (Python 3 compatible)
+wxPython>=4.2.0
+
+# No additional dependencies required - using Python 3 standard library:
+# - urllib.request, urllib.parse, urllib.error (replaces urllib2)
+# - http.cookiejar (replaces cookielib)
+# - configparser (replaces ConfigParser)
+# - io (replaces cStringIO)

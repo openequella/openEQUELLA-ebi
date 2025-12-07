@@ -161,8 +161,7 @@ class Engine():
                                                 "navigationnodes",
                                                 "url",
                                                 "history",
-                                                "thumbnail",
-                                                "itembody"
+                                                "thumbnail"
                                             ]
         self.sourceIdentifierReceipts = {}
         self.exportedFiles = []
@@ -196,10 +195,10 @@ class Engine():
         if log and self.logFileName != "":
         
             # create/open log file
-            logfile = open(os.path.join(self.logfilespath, self.logFileName), "a", encoding=self.encoding)
+            logfile = open(os.path.join(self.logfilespath, self.logFileName),"a")
               
             # write entry  
-            logfile.write(entry + "\n")
+            logfile.writelines(entry.encode(self.encoding) + "\n")
             
             logfile.close()
             
@@ -208,36 +207,6 @@ class Engine():
             self.log.AddLogText(entry + "\n", style)
             print(entry)
         return
-    
-    def openFileForReading(self, filepath):
-        """Safely open a file for binary reading with proper error handling.
-        
-        Args:
-            filepath: Full path to the file to open
-            
-        Returns:
-            File object opened in binary read mode
-            
-        Raises:
-            Exception: If file doesn't exist or cannot be opened
-        """
-        try:
-            # Final validation before opening
-            if not os.path.exists(filepath):
-                raise FileNotFoundError("File does not exist: '%s'" % filepath)
-            
-            if not os.path.isfile(filepath):
-                raise IsADirectoryError("Path is a directory, not a file: '%s'" % filepath)
-            
-            if not os.access(filepath, os.R_OK):
-                raise PermissionError("Cannot read file: '%s' (permission denied)" % filepath)
-            
-            # Open file
-            file_obj = open(filepath, "rb")
-            return file_obj
-            
-        except Exception as e:
-            raise Exception("Failed to open file '%s': %s" % (filepath, str(e)))
 
     def translateError(self, rawError, context = ""):
         
@@ -316,7 +285,7 @@ class Engine():
                         raise
                     else:
                         exceptionValue = sys.exc_info()[1]
-                        scriptErrorMsg = "Invalid column heading '%s' (column %s). %s" % (columnHeading, n + 1, str(exceptionValue))
+                        scriptErrorMsg = "Invalid column heading '%s' (column %s). %s" % (columnHeading, n + 1, exceptionValue)
                         raise Exception(scriptErrorMsg)
                     
                 # warn the user if any XPaths are attempting to overwrite system nodes
@@ -346,9 +315,9 @@ class Engine():
         except:
             if self.debug:
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                self.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)))
+                self.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)))
     
-    def getContributableCollections(self) -> list[str]:
+    def getContributableCollections(self):
         try:
             # connect to EQUELLA
             self.tle = TLEClient(self, self.institutionUrl, self.username, self.password, self.proxy, self.proxyUsername, self.proxyPassword, self.debug)
@@ -360,12 +329,18 @@ class Engine():
                 raise Exception(self.translateError(str(sys.exc_info()[1]), "login"))
 
         try:
-            # get all accessible collections and their IDs
-            itemDefs = self.tle._enumerateItemDefs(forExport=True)
+            # get all contributable collections and their IDs
+            itemDefs = self.tle._enumerateItemDefs()
+            print(f"\n=== DEBUG: Raw itemDefs returned from EQUELLA ===")
+            print(f"Type: {type(itemDefs)}")
+            print(f"Length: {len(itemDefs)}")
+            print(f"Content: {itemDefs}")
+            print("=" * 50)
             
             self.collectionIDs.clear()
             for key, value in itemDefs.items():
                 self.collectionIDs[key] = value["uuid"]
+                print(f"DEBUG: Added collection: '{key}' -> '{value['uuid']}'")
                             
             self.tle.logout()
             
@@ -382,14 +357,15 @@ class Engine():
             else:            
                 raise Exception(self.translateError(str(sys.exc_info()[1])))
     
+    # find index of first matching instance of value, return -1 if not found
     def lookupColumnIndex(self, columnProperty, value):
-        """Find index of first column matching the given property and value.
-        
-        Returns -1 if not found.
-        """
         for index, column in enumerate(self.currentColumns):
             if column[columnProperty] == value:
+                
+                # value found
                 return index
+            
+        # value not found
         return -1
     
     def tryPausing(self, message, newline = False):
@@ -490,11 +466,11 @@ class Engine():
             self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Successfully connected to EQUELLA%s" % versionDisplay)
 
             # Get Collection UUID
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Target collection: '" + str(self.collection)  + "'...")
+            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Target collection: '" + self.collection  + "'...")
 
-            # if not previously retreieved get all contributable/searchable collections and their IDs
+            # if not previously retreieved get all contributable collections and their IDs
             if len(self.collectionIDs) == 0:
-                itemDefs = self.tle._enumerateItemDefs(forExport=self.export)
+                itemDefs = self.tle._enumerateItemDefs()
                 for key, value in itemDefs.items():
                     self.collectionIDs[key] = value["uuid"]                
             
@@ -502,12 +478,12 @@ class Engine():
             if self.collection in self.collectionIDs.keys():
                 itemdefuuid = self.collectionIDs[self.collection]
             else:
-                raise Exception("Collection '" + str(self.collection) + "'" + " not found")
+                raise Exception("Collection '" + self.collection + "'" + " not found")
             try:
                 if not os.path.isdir(self.csvFilePath):
-                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Parsing CSV file (" + str(self.csvFilePath) + ")...")
+                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Parsing CSV file (" + self.csvFilePath + ")...")
                 else:
-                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "WARNING: No CSV specified. CSV path is " + str(self.csvFilePath))
+                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "WARNING: No CSV specified. CSV path is " + self.csvFilePath)
                     
                 if not owner.verifyCurrentColumnsMatchCSV():
                     raise Exception('CSV headings do not match the settings, update the settings to match the CSV column headings')
@@ -532,8 +508,6 @@ class Engine():
                 # ignore Source Identifier if column datatype is set to Ignore
                 if sourceIdentifierColumn != -1 and self.currentColumns[sourceIdentifierColumn][self.COLUMN_DATATYPE] == self.IGNORE:
                     sourceIdentifierColumn = -1
-                
-                self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: rowErrorColumn = %d" % rowErrorColumn)
                 
                 # parse CSV
                 self.csvParse(owner,
@@ -674,14 +648,12 @@ class Engine():
         # if real form receipt filename and run check if receipts file is editable
         receiptFilename = ""
         if not self.export:
-            if itemIdColumn != -1 or rowErrorColumn != -1:
+            if itemIdColumn != -1:
                 # form receipts filename
                 if owner.txtCSVPath.GetValue() != "" and not os.path.isdir(self.csvFilePath):
                     receiptFilename = os.path.join(self.receiptFolder, os.path.basename(self.csvFilePath)) 
                 else:
                     receiptFilename = os.path.join(self.receiptFolder, "receipt.csv") 
-                
-                self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: receiptFilename = %s" % receiptFilename)
                     
                 if os.path.exists(receiptFilename):
                     try:
@@ -700,7 +672,7 @@ class Engine():
         # calculate absolute appachments basepath for attachments
         self.absoluteAttachmentsBasepath = os.path.join(os.path.dirname(self.csvFilePath), self.attachmentsBasepath.strip())
         if self.debug:
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Absolute attachments basepath is " + str(self.absoluteAttachmentsBasepath))
+            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Absolute attachments basepath is " + self.absoluteAttachmentsBasepath)
             
         # indicate what scripts, if any, are present
         scriptsPresent = []
@@ -754,7 +726,7 @@ class Engine():
                     raise
                 else:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                    formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                     scriptErrorMsg = "An error occured in the Start Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                     raise Exception(scriptErrorMsg)
         if not self.export:
@@ -805,7 +777,7 @@ class Engine():
             except:
                 if self.debug:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    self.echo(''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)))
+                    self.echo(''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)))
                 raise Exception("Invalid row filter specified")
         if not self.export:
             # echo rows to be processed
@@ -903,8 +875,7 @@ class Engine():
                                                                         thumbnailsColumn,
                                                                         selectedThumbnailColumn,
                                                                         ownerColumn,
-                                                                        collaboratorsColumn,
-                                                                        rowErrorColumn)
+                                                                        collaboratorsColumn)
                                                                         
                     # add to row receipts
                     rowReceipts[rowCounter] = (savedItemID, savedItemVersion)
@@ -917,29 +888,9 @@ class Engine():
                         # assign itemID to receipt cell
                         rowData[itemIdColumn] = savedItemID
                         rowData[versionColumn] = str(savedItemVersion)
-                    
-                    # update row error column if it exists (independent of itemIdColumn)
-                    if rowErrorColumn != -1:
-                        self.echo("  DEBUG: rowData length = %d, rowErrorColumn = %d" % (len(rowData), rowErrorColumn))
-                        if rowErrorColumn < len(rowData):
+                        if rowErrorColumn != -1:
                             rowData[rowErrorColumn] = rowError
-                        else:
-                            # Extend rowData if necessary
-                            while len(rowData) <= rowErrorColumn:
-                                rowData.append("")
-                            rowData[rowErrorColumn] = rowError
-                            self.echo("  DEBUG: Extended rowData to length %d" % len(rowData))
-                        
-                        if rowError != "":
-                            self.echo("  Row error captured: %s" % rowError)
-                            self.echo("  DEBUG: Storing error at index %d in rowData" % rowErrorColumn)
-                            self.echo("  DEBUG: rowData[%d] = %s" % (rowErrorColumn, rowData[rowErrorColumn]))
-                            self.echo("  DEBUG: csvArray[%d][%d] = %s" % (rowCounter, rowErrorColumn, self.csvArray[rowCounter][rowErrorColumn]))
-                    else:
-                        self.echo("  DEBUG: rowErrorColumn is -1, error not stored")
-                    
-                    # always update the csvArray with potentially modified rowData
-                    self.csvArray[rowCounter] = rowData
+                        self.csvArray[rowCounter] = rowData
                         
                     # update progress bar
                     self.owner.progressGauge.SetValue(processedCounter)
@@ -984,37 +935,32 @@ class Engine():
                 except:
                     if self.debug:
                         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                        scriptErrorMsg = "An error occured in the End Script:\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                        scriptErrorMsg = "An error occured in the End Script:\n" + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
                         self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + scriptErrorMsg, style=2)
                     else:
                         exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                        formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                        formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                         scriptErrorMsg = "An error occured in the End Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                         self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + scriptErrorMsg, style=2)  
                 
                 
         
-            # output receipts if Item ID column specified or Row Error column specified, and real run
-            if itemIdColumn != -1 or rowErrorColumn != -1:
+            # output receipts if Item ID column specified and real run
+            if itemIdColumn != -1:
                 
                 self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Writing receipts file...")
-                self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: Writing to %s" % receiptFilename)
             
                 # create receipts folder if one doesn't exist
                 if not os.path.exists(self.receiptFolder):
                     os.makedirs(self.receiptFolder)
                     
                 # open csv writer and output orginal csv rows using self.columnHeadings as first row (instead of first row of self.csvArray)
-                f = open(receiptFilename, "w", encoding=self.encoding, newline='')
+                f = open(receiptFilename, "wb")
                 writer = UnicodeWriter(f, self.encoding)
                 writer.writerow(list(self.columnHeadings))
-                self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: Writing header row with %d columns" % len(self.columnHeadings))
                 for i in range(1, len(self.csvArray)):
-                    row_to_write = list(self.csvArray[i])
-                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: Writing row %d with %d columns: %s" % (i, len(row_to_write), str(row_to_write)))
-                    writer.writerow(row_to_write)
+                    writer.writerow(list(self.csvArray[i]))
                 f.close()
-                self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: Receipt file closed")
                 
         else:
             # export
@@ -1050,16 +996,6 @@ class Engine():
         self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + resultReport)
         
         owner.mainStatusBar.SetStatusText(resultReport, 0)
-        
-        # Write back to original CSV file if Row Error column exists or if not in test mode
-        if (not testOnly or rowErrorColumn != -1) and not os.path.isdir(self.csvFilePath):
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Writing CSV file back to: %s" % self.csvFilePath)
-            with open(self.csvFilePath, "w", encoding=self.encoding, newline='') as f:
-                writer = UnicodeWriter(f, self.encoding)
-                writer.writerows(self.csvArray)
-                f.flush()
-                os.fsync(f.fileno())
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "CSV file updated successfully")
              
                     
                         
@@ -1109,7 +1045,7 @@ class Engine():
                 if collection in collectionIDs:
                     itemdefuuid = collectionIDs[collection]
                 else:
-                    raise Exception("Collection specified not found: " + str(collection))
+                    raise Exception("Collection specified not found: " + collection)
         # if source identifer (and optionally collection) specified then find resource by that 
         if sourceIdentifier != "":
             
@@ -1220,7 +1156,7 @@ class Engine():
                 raise Exception("No holding item attached to this portion")
         else:
             raise Exception("No metadata targets for holding items found in this portion")
-    
+    # processRow() creates a single item in EQUELLA based on one row of metadata
     def processRow(self,
                    rowCounter,
                    meta,
@@ -1240,32 +1176,15 @@ class Engine():
                    thumbnailsColumn,
                    selectedThumbnailColumn,
                    ownerColumn,
-                   collaboratorsColumn,
-                   rowErrorColumn):
-        """Create or update a single item in EQUELLA from a CSV row.
-        
-        Processes metadata, attachments, URLs, and resources for one row, handling:
-        - Item creation or update based on identifiers
-        - Attachment processing (files, URLs, EQUELLA resources, custom XML)
-        - Unzip commands for archive extraction
-        - Metadata replacement/append modes
-        - User/collaborator resolution
-        
-        Returns tuple: (itemID, itemVersion, error_message)
-        """
+                   collaboratorsColumn):
                        
 
+        # unzipAttachment attachs and unzips an attachment and sets start pages based on tuple of tuples formatted attachment name
         def unzipAttachment():
-            """Process UNZIP command: upload zip, unzip on server, add extracted files as attachments with ZIP_ATTACHMENT_UUID references.
-            
-            Expected format for attachment names: (("file1.pdf", "Description 1"), ("file2.pdf", "Description 2"))
-            Special format "*" includes all files in zip.
-            Original zip file is always added as the first attachment.
-            """
             self.echo("    Unzip file")
             if not testOnly:
                 attemptingUpload = True
-                item.attachFile('_zips/' + filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
+                item.attachFile('_zips/' + filename, open(filepath, "rb"), uploadStatus, self.chunkSize)
                 if self.StopProcessing:
                     return
                 attemptingUpload = False
@@ -1273,42 +1192,70 @@ class Engine():
                 item.unzipFile('_zips/' + filename, filename)
 
             if attachmentLinkName != "":
+                # 
                 try:
+                    # read the attachment link name in as a tuple of tuples using exec()
+                    # add a superfluous tuple to coax the string into a tuple of tuples even if only one tuple
                     startPagesListAsString = "((\"#####\",\"#####\")," + attachmentLinkName[1:]
-                    exec_dict = {}
-                    exec("startPagesList = " + startPagesListAsString, exec_dict)
-                    startPagesList = exec_dict['startPagesList']
+                    exec("startPagesList = " + startPagesListAsString, globals(), locals())
+
                 except:
                     raise Exception("List of links to unzipped files incorrectly formatted.")
-                
-                parentZipAttachmentUUID = str(uuid.uuid4())
-                
-                zipAttachmentUUID = str(uuid.uuid4())
-                item.addStartPage(filename, "_zips/" + filename, filesize, zipAttachmentUUID)
-                
-                if self.attachmentMetadataTargets:
-                    item.getXml().createNode(self.columnHeadings[n], zipAttachmentUUID)
-                
+                # populate a dictionary rendition of the Start Pages List
                 startPagesDict = {}
                 for startPage in startPagesList:
                     if startPage[0] != "#####":
                         startPagesDict[startPage[0]] = startPage[1]
 
+                # iterate through Start Pages List
                 for startPage in startPagesList:
+                    
+                    # check if start page for zip itself
                     if startPage[0] == filename:
-                        pass
+                        
+                        # generate attachment UUID
+                        attachmentUUID = str(uuid.uuid4())
+                        
+                        # add attachment element
+                        item.addStartPage(startPage[1], "_zips/" + filename, filesize, attachmentUUID)
+                        
+                        # add corresponding metadata target for attachment
+                        if self.attachmentMetadataTargets:
+                            item.getXml().createNode(self.columnHeadings[n], attachmentUUID)
+                        
+                        
+                    # check if wildcard exists
                     elif startPage[0] == "*":
                         for archiveFile in zfobj.namelist():
+                            
+                            # check if file not already specified, not zip itself and not a folder
                             if (archiveFile not in startPagesDict) and (archiveFile != filename) and not archiveFile.endswith("/"):
+                                # get file size
                                 archiveFilesize = zfobj.getinfo(archiveFile).file_size
+                                
+                                # generate attachment UUID
                                 attachmentUUID = str(uuid.uuid4())
-                                item.addStartPageWithZipAttribute(os.path.basename(archiveFile), filename + "/" + archiveFile, archiveFilesize, attachmentUUID, parentZipAttachmentUUID)
+                                
+                                # add attachment element
+                                item.addStartPage(os.path.basename(archiveFile), filename + "/" + archiveFile, archiveFilesize, attachmentUUID)
+
+                                # add corresponding metadata target for attachment
                                 if self.attachmentMetadataTargets:
                                     item.getXml().createNode(self.columnHeadings[n], attachmentUUID)
+                                
+                    
+                    # not the zip itself or a wildcard so name as specified
                     elif startPage[0] in startPagesDict:
+                        # get file size
                         archiveFilesize = zfobj.getinfo(startPage[0]).file_size
+                        
+                        # generate attachment UUID
                         attachmentUUID = str(uuid.uuid4())
-                        item.addStartPageWithZipAttribute(startPage[1], filename + "/" + startPage[0], archiveFilesize, attachmentUUID, parentZipAttachmentUUID)
+                        
+                        # add attachment element
+                        item.addStartPage(startPage[1], filename + "/" + startPage[0], archiveFilesize, attachmentUUID)
+
+                        # add corresponding metadata target for attachment
                         if self.attachmentMetadataTargets:
                             item.getXml().createNode(self.columnHeadings[n], attachmentUUID)
                         
@@ -1334,7 +1281,7 @@ class Engine():
                         
                 if self.Skip:
                     self.echo("  Row skipped")
-                    return "", "", "", [], ""              
+                    return "", "", "", []              
                 
                 # resolve owner to an ID
                 ownerUsername = meta[ownerColumn].strip()
@@ -1351,29 +1298,12 @@ class Engine():
                         raise Exception(error)
                     matchingUserNodes = matchingUsers.getNodes("user", False)
 
-                    # if any matches, try to find exact username match
+                    # if any matches get first matching user
                     if len(matchingUserNodes) > 0:
-                        # Try to find exact match
-                        foundExactMatch = False
-                        for userNode in matchingUserNodes:
-                            try:
-                                userUUID = userNode.getElementsByTagName("uuid")[0].firstChild.nodeValue
-                                userInfo = self.tle.getUser(userUUID)
-                                username = userInfo.getNode("username")
-                                if username and username.strip().lower() == ownerUsername.lower():
-                                    ownerID = userUUID
-                                    foundExactMatch = True
-                                    break
-                            except:
-                                # If getUser fails, skip this user
-                                pass
-                        
-                        # If no exact match found, use first result
-                        if not foundExactMatch:
-                            ownerID = matchingUserNodes[0].getElementsByTagName("uuid")[0].firstChild.nodeValue
+                        ownerID = matchingUserNodes[0].getElementsByTagName("uuid")[0].firstChild.nodeValue
                     elif self.useEBIUsername:
                         ownerColumn = -1
-                        self.echo("  '%s' not found so ignoring." % (ownerUsername))
+                        self.echo("  '%s' not found so ignoring." % (ownerUsername, self.username))
                     else:
                         if self.saveNonexistentUsernamesAsIDs:
                             ownerID = ownerUsername
@@ -1404,28 +1334,10 @@ class Engine():
                         
                         matchingUserNodes = matchingUsers.getNodes("user", False)
 
-                        # if any matches, try to find exact username match
+                        # if any matches get first matching user
                         if len(matchingUserNodes) > 0:
-                            # Try to find exact match
-                            foundExactMatch = False
-                            for userNode in matchingUserNodes:
-                                try:
-                                    userUUID = userNode.getElementsByTagName("uuid")[0].firstChild.nodeValue
-                                    userInfo = self.tle.getUser(userUUID)
-                                    username = userInfo.getNode("username")
-                                    if username and username.strip().lower() == specifiedCollaborator.strip().lower():
-                                        collaboratorID = userUUID
-                                        collaboratorIDs.append(collaboratorID)
-                                        foundExactMatch = True
-                                        break
-                                except:
-                                    # If getUser fails, skip this user
-                                    pass
-                            
-                            # If no exact match found, use first result
-                            if not foundExactMatch:
-                                collaboratorID = matchingUserNodes[0].getElementsByTagName("uuid")[0].firstChild.nodeValue
-                                collaboratorIDs.append(collaboratorID)
+                            collaboratorID = matchingUserNodes[0].getElementsByTagName("uuid")[0].firstChild.nodeValue
+                            collaboratorIDs.append(collaboratorID)
                         elif self.ignoreNonexistentCollaborators:
                             self.echo("  '%s' not found so ignoring that collaborator." % specifiedCollaborator.strip())
                         else:
@@ -1564,7 +1476,7 @@ class Engine():
                                 raise
                             else:
                                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                                formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                                formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                                 scriptErrorMsg = "An error occured in the Row Pre-Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                                 raise Exception(scriptErrorMsg)
                     if not createNewItem:
@@ -1686,7 +1598,7 @@ class Engine():
                                 raise
                             else:
                                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                                formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                                formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                                 scriptErrorMsg = "An error occured in the Row Pre-Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                                 raise Exception(scriptErrorMsg)
                     # process the contents of attachmentMetadataColumn for any {uuid) placeholders
@@ -1735,8 +1647,8 @@ class Engine():
                             
                             isMetadataField = False
                             
-                            # delete all url metadata targets if first occurence (but not in append attachments mode)
-                            if self.attachmentMetadataTargets and not self.appendAttachments:
+                            # delete all url metadata targets if first occurence
+                            if self.attachmentMetadataTargets:
                                 if self.columnHeadings[:n].count(self.columnHeadings[n]) == 0:
                                     item.getXml().removeNode(self.columnHeadings[n])                            
         
@@ -1744,7 +1656,7 @@ class Engine():
                             values = meta[n].split(actualDelimiter)
                             for i in range(len(values)):
                                 if values[i].strip() != "":
-                                    url = str(values[i].replace(" ", "%20"))
+                                    url = unicode(values[i].replace(" ", "%20"))
         
                                     self.echo("  Hyperlink: " + url)
                                     
@@ -1789,8 +1701,8 @@ class Engine():
         
                             isMetadataField = False
                             
-                            # delete all attachment metadata targets if this is the first occurence (but not in append attachments mode)
-                            if self.attachmentMetadataTargets and not self.appendAttachments:
+                            # delete all attachment metadata targets if this is the first occurence
+                            if self.attachmentMetadataTargets:
                                 if self.columnHeadings[:n].count(self.columnHeadings[n]) == 0:
                                     item.getXml().removeNode(self.columnHeadings[n])
                             
@@ -1802,29 +1714,17 @@ class Engine():
                                     # get absolute path to file
                                     filepath = os.path.join(self.absoluteAttachmentsBasepath, values[i])
                                     
-                                    # Validate file path exists
-                                    if not os.path.exists(filepath):
-                                        raise Exception("File not found: '%s'" % filepath)
-                                    
                                     # ensure that attachment specified is not a directory
                                     if os.path.isdir(filepath):
-                                        raise Exception("'%s' is a directory, not a file" % filepath)
-                                    
-                                    # Validate file can be read
-                                    if not os.access(filepath, os.R_OK):
-                                        raise Exception("Cannot read file: '%s' (permission denied)" % filepath)
-                                    
+                                        raise Exception(filepath + " is not a file")
                                     # get filename and file size
                                     filename = os.path.basename(filepath)
-                                    try:
-                                        filesize = os.path.getsize(filepath)
-                                    except (OSError, IOError) as e:
-                                        raise Exception("Cannot get file size for '%s': %s" % (filepath, str(e)))
+                                    filesize = os.path.getsize(filepath)
                                     
                                     uploadStatus = "   "
         
                                     # find corresponding Attachment Name column for Attachment Location column
-                                    attachmentLinkName = ""
+                                    attachmentLinkName = ""                                    
                                     attachmentNameColumnCount = 0
                                     for col in range(0, len(meta)):
                                         if self.currentColumns[col][self.COLUMN_DATATYPE] == self.ATTACHMENTNAMES:
@@ -1890,16 +1790,16 @@ class Engine():
                                                         # if imsmanifest indicates that package is a SCORM package then attach as a SCORM package
                                                         if self.scormformatsupport and imsmanifest.getNode("metadata/schema") == "ADL SCORM":
                                                             self.echo("    Package is a SCORM package")
-                                                            item.attachSCORM(self.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
+                                                            item.attachSCORM(open(filepath, "rb"), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
                                                         else:
-                                                            item.attachIMS(self.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
+                                                            item.attachIMS(open(filepath, "rb"), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
                                                         attemptingUpload = False
                                                         
                                                         attachmentType = self.attachmentTypeIMS
                                                         
                                                     if "SCORM" in commandOptions:
                                                         attemptingUpload = True
-                                                        item.attachSCORM(self.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
+                                                        item.attachSCORM(open(filepath, "rb"), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
                                                         attemptingUpload = False
                                                         
                                                         attachmentType = self.attachmentTypeSCORM
@@ -1927,7 +1827,7 @@ class Engine():
                                         elif ("AUTO" in commandOptions):
                                             if not testOnly:
                                                 attemptingUpload = True
-                                                item.attachFile(filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
+                                                item.attachFile(filename, open(filepath, "rb"), uploadStatus, self.chunkSize)
                                                 attemptingUpload = False
                                             
                                             attachmentType = self.attachmentTypeFile
@@ -1939,19 +1839,10 @@ class Engine():
                                             # no command options
                                             if not testOnly:
                                                 attemptingUpload = True
-                                                item.attachFile(filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
+                                                item.attachFile(filename, open(filepath, "rb"), uploadStatus, self.chunkSize)
                                                 attemptingUpload = False
                                             
                                             attachmentType = self.attachmentTypeFile
-                                    
-                                    else:
-                                        # No command options specified - treat as regular file attachment
-                                        if not testOnly:
-                                            attemptingUpload = True
-                                            item.attachFile(filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
-                                            attemptingUpload = False
-                                        
-                                        attachmentType = self.attachmentTypeFile
 
                                     # add start page if attachment is a simple file
                                     if attachmentType == self.attachmentTypeFile:
@@ -1975,22 +1866,15 @@ class Engine():
                                             if  "*" + os.path.splitext(filepath)[1].lower() in (wildcard.lower() for wildcard in thumbnails):
                                                 thumbnail = ""
                                             
-                                        # Get the custom XPath from column heading if it's not a standard column
-                                        customXPath = None
-                                        if self.columnHeadings[n].strip() != "" and not self.columnHeadings[n].startswith("#"):
-                                            customXPath = self.columnHeadings[n]
-                                        
                                         if attachmentLinkName != "":
                                             # add start page with provided attachment link name
-                                            item.addStartPage(attachmentLinkName, filename, filesize, attachmentUUID, thumbnail, self.appendAttachments, customXPath)
+                                            item.addStartPage(attachmentLinkName, filename, filesize, attachmentUUID, thumbnail)
                                         else:
                                             # add start page using filename as attachment link
-                                            item.addStartPage(filename, filename, filesize, attachmentUUID, thumbnail, self.appendAttachments, customXPath)
+                                            item.addStartPage(filename, filename, filesize, attachmentUUID, thumbnail)
                                         
                                         # add metadata target for attachment
-                                        # NOTE: If customXPath was provided, addStartPage already handled storing the UUID there
-                                        # So only do this if customXPath was NOT provided
-                                        if self.attachmentMetadataTargets and not customXPath:
+                                        if self.attachmentMetadataTargets:
                                             # only add an attachment metadata target if the column is neither blank nor starts with a "#"
                                             if self.columnHeadings[n].strip() != "" and self.columnHeadings[n][:1] != "#":
                                                 item.getXml().createNode(self.columnHeadings[n], attachmentUUID)
@@ -2099,7 +1983,7 @@ class Engine():
                                     
                                         if not testOnly:
                                             attemptingUpload = True
-                                            item.attachFile(rawFile["filename"], self.openFileForReading(rawFile["filepath"]), uploadStatus, self.chunkSize)
+                                            item.attachFile(rawFile["filename"], open(rawFile["filepath"], "rb"), uploadStatus, self.chunkSize)
                                             attemptingUpload = False
         
                                         
@@ -2116,8 +2000,8 @@ class Engine():
                                 isCalHolding = True
                                 calHoldingMetadataTarget = self.columnHeadings[n]
                         
-                            # delete all attachment metadata targets if this is the first occurence (but not in append attachments mode)
-                            if self.attachmentMetadataTargets and not self.appendAttachments:
+                            # delete all attachment metadata targets if this is the first occurence
+                            if self.attachmentMetadataTargets:
                                 if self.columnHeadings[:n].count(self.columnHeadings[n]) == 0:
                                     item.getXml().removeNode(self.columnHeadings[n])
 
@@ -2126,7 +2010,7 @@ class Engine():
                             for i in range(len(values)):
                                 if values[i].strip() != "":
 
-                                    resourceUrl = str(values[i])
+                                    resourceUrl = unicode(values[i])
                                     self.echo("  EQUELLA resource: " + resourceUrl)
    
                                     resourceItemUuid, resourceItemVersion, resourceAttachmentUuid, resourceName = self.getEquellaResourceDetail(resourceUrl, itemdefuuid, collectionIDs, sourceIdentifierColumn, isCalHolding)
@@ -2167,12 +2051,10 @@ class Engine():
 
                         # process custom attachments
                         if self.currentColumns[n][self.COLUMN_DATATYPE] == self.CUSTOMATTACHMENTS and meta[n].strip() != "":
-                            
-                            isMetadataField = False
 
                             # form XML document from fragment (no root nodes needed in fragment)
                             xmlAttachmentElementsFragmentString = "<?xml version=\"1.0\" encoding=\"%s\"?><fragment>%s</fragment>" % (self.encoding, meta[n].strip())
-                            xmlAttachmentElements = PropBagEx(xmlAttachmentElementsFragmentString, encoding=self.encoding)
+                            xmlAttachmentElements = PropBagEx(xmlAttachmentElementsFragmentString.encode(self.encoding))
                             
                             # check /uuid elements for UUID placeholders
                             for attachmentElement in xmlAttachmentElements.iterate("attachment"):
@@ -2195,19 +2077,15 @@ class Engine():
                                
                                 # append to system attachments
                                 item.getXml().setNode("item/attachments", "")
-                                item.getXml().root.getElementsByTagName("item")[0].getElementsByTagName("attachments")[0].appendChild(attachmentElement.root.cloneNode(True))
-                                
+                                item.getXml().root.getElementsByTagName("item")[0].getElementsByTagName("attachments")[0].appendChild(attachmentElement.root.cloneNode(True))                                    
+                                    
                                 # add metadata target
                                 if self.attachmentMetadataTargets:
                                     if self.columnHeadings[n].strip() != "" and self.columnHeadings[n][:1] != "#":
                                         item.getXml().createNode(self.columnHeadings[n], attachmentUUID)                                      
                                         
-                        # process metadata field (skip if this is a Custom Attachments column)
-                        # Detect Custom Attachments by checking if content contains <attachment> tag (XML fragment)
-                        isCustomAttachmentsColumn = (self.currentColumns[n][self.COLUMN_DATATYPE] == self.CUSTOMATTACHMENTS or 
-                                                   (meta[n].strip().lower().startswith("<attachment") and "<type>" in meta[n].lower()))
-                        
-                        if self.currentColumns[n][self.COLUMN_DATATYPE] == self.METADATA and not isCustomAttachmentsColumn:
+                        # process metadata field
+                        if self.currentColumns[n][self.COLUMN_DATATYPE] == self.METADATA:
         
                             # check if column is flagged for XML fragments
                             if self.currentColumns[n][self.COLUMN_XMLFRAGMENT] == "YES":
@@ -2220,7 +2098,7 @@ class Engine():
         
                                     # form XML document from fragment (no root nodes needed in fragment)
                                     xmlFragmentString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><fragment>%s</fragment>" % (meta[n])
-                                    xmlFragment = PropBagEx(str(xmlFragmentString))
+                                    xmlFragment = PropBagEx(unicode(xmlFragmentString))
                                     
                                     # remove all indenting
                                     stripNode(xmlFragment.root, True)
@@ -2235,12 +2113,9 @@ class Engine():
                                                 item.prop.removeNode(self.columnHeadings[n] + "/" + child.nodeName)
         
                                     # append xml fragment
-                                    parentNodes = item.prop.getNodes(self.columnHeadings[n], False)
-                                    if len(parentNodes) > 0:
-                                        parentNode = parentNodes[0]
-                                        if hasattr(parentNode, 'appendChild'):
-                                            for child in xmlFragment.root.childNodes:
-                                                parentNode.appendChild(child.cloneNode(True))
+                                    parentNode = item.prop.getNodes(self.columnHeadings[n], False)[0]
+                                    for child in xmlFragment.root.childNodes:
+                                        parentNode.appendChild(child.cloneNode(True))
                                 else:
                                     # empty cell so clear the text of the node
                                     if self.existingMetadataMode != self.APPENDMETA and 'APPENDMETA' not in commandOptions:
@@ -2274,7 +2149,7 @@ class Engine():
                                         if newValues[i].strip().lower() == "<null>":
                                             newValues[i] = ""
                                             
-                                        item.getXml().createNode(self.columnHeadings[n], str(newValues[i].strip()))
+                                        item.getXml().createNode(self.columnHeadings[n], unicode(newValues[i].strip()))
 
                         # column is set to IGNORE
                         if self.currentColumns[n][self.COLUMN_DATATYPE] == self.IGNORE:
@@ -2364,7 +2239,7 @@ class Engine():
                                     raise
                                 else:
                                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                                    formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                                    formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                                     scriptErrorMsg = "An error occured in the Row Post-Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                                     raise Exception(scriptErrorMsg)
                     if not self.StopProcessing and not self.Skip:
@@ -2429,7 +2304,7 @@ class Engine():
 
                                         exactError = self.translateError(str(exactError))
                                         
-                                        self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (str(exactError), str(errorDebug)), style=2)
+                                        self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (exactError, errorDebug), style=2)
 
                             # add collaborators if any specified and existing item being edited
                             if collaboratorsColumn != -1 and not createNewVersion and not createNewItem and len(collaboratorIDs) > 0:
@@ -2458,7 +2333,7 @@ class Engine():
 
                                     exactError = self.translateError(str(exactError))
                                     
-                                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (str(exactError), str(errorDebug)), style=2)
+                                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (exactError, errorDebug), style=2)
                                 
                             if createNewItem:
                                 self.echo("  Item successfully imported%s (%s/%s)" % (statusMessage, savedItemID, savedItemVersion))
@@ -2531,7 +2406,7 @@ class Engine():
                         actionError =  " uploading file"
                         attemptingUpload = False
 
-                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR%s: %s%s" % (str(actionError), str(exactError), str(errorDebug)), style=2)
+                    self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR%s: %s%s" % (actionError, exactError, errorDebug), style=2)
 
                     # halt processing if the error will apply to all rows
                     if allRowsError:
@@ -2541,7 +2416,7 @@ class Engine():
                     if sourceIdentifierColumn != -1:
                         sourceIdentifier = meta[sourceIdentifierColumn].strip()
                         
-                    return savedItemID, savedItemVersion, sourceIdentifier, meta, "ERROR%s: %s%s" % (str(actionError), str(exactError), str(errorDebug))
+                    return savedItemID, savedItemVersion, sourceIdentifier, meta, "ERROR%s: %s%s" % (actionError, exactError, errorDebug)
     
     def exportCSV(self,
                     owner,
@@ -2604,7 +2479,7 @@ class Engine():
                     raise
                 else:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                    formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                     scriptErrorMsg = "An error occured in the Start Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                     raise Exception(scriptErrorMsg)
         # check column headings
@@ -2679,7 +2554,7 @@ class Engine():
             self.csvArray = self.csvArray[:1]
             
             # outer loop of "pages" of pageSize
-            pagesRequired = available // pageSize + 1
+            pagesRequired = available / pageSize + 1
             offset = 0
             lastScheduledItem = -1
             if len(scheduledRows) > 0:
@@ -2764,7 +2639,7 @@ class Engine():
                                 errorDebug = "\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
 
                             exactError = self.translateError(str(exactError))
-                            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (str(exactError), str(errorDebug)), style=2)
+                            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (exactError, errorDebug), style=2)
 
                             # halt processing if the error will apply to all rows
                             if allRowsError:
@@ -2826,7 +2701,7 @@ class Engine():
                                     rowitemdefuuid = collectionIDs[collectionName]
                                     self.echo("  Source collection: '%s'" % collectionName)
                                 else:
-                                    raise Exception("'" + str(collectionName) + "' collection not found")
+                                    raise Exception("'" + collectionName + "' collection not found")
                         itemFound = False
                         
                         # get targeted item version if target version specified
@@ -2957,7 +2832,7 @@ class Engine():
                             errorDebug = "\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
 
                         exactError = self.translateError(str(exactError))
-                        self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (str(exactError), str(errorDebug)), style=2)
+                        self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "ERROR: %s%s" % (exactError, errorDebug), style=2)
 
                         # halt processing if the error will apply to all rows
                         if allRowsError:
@@ -3001,29 +2876,21 @@ class Engine():
             except:
                 if self.debug:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    scriptErrorMsg = "An error occured in the End Script:\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                    scriptErrorMsg = "An error occured in the End Script:\n" + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
                     self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + scriptErrorMsg)
                 else:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                    formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                     scriptErrorMsg = "An error occured in the End Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                     self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + scriptErrorMsg)   
 
         
         # open csv writer and output write local copy to csv
-        self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: testOnly=%s, csvFilePath=%s, is_dir=%s" % (testOnly, self.csvFilePath, os.path.isdir(self.csvFilePath)))
-        # Write back to original CSV if Row Error column exists (even in test mode) or if not test mode
-        if (not testOnly or rowErrorColumn != -1) and not os.path.isdir(self.csvFilePath):
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Writing %d rows to CSV file: %s" % (len(self.csvArray), self.csvFilePath))
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: Header row: %s" % str(self.csvArray[0]))
-            if len(self.csvArray) > 1:
-                self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: First data row: %s" % str(self.csvArray[1]))
-            with open(self.csvFilePath, "w", encoding=self.encoding, newline='') as f:
-                writer = UnicodeWriter(f, self.encoding)
-                writer.writerows(self.csvArray)
-                f.flush()
-                os.fsync(f.fileno())
-            self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "CSV file written successfully (file size: %d bytes)" % os.path.getsize(self.csvFilePath))
+        if not testOnly and not os.path.isdir(self.csvFilePath):
+            f = open(self.csvFilePath, "wb")
+            writer = UnicodeWriter(f, self.encoding)
+            writer.writerows(self.csvArray)
+            f.close()
             
     def exportItem(self,
                     rowCounter,
@@ -3085,7 +2952,7 @@ class Engine():
                     raise
                 else:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                    formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                     scriptErrorMsg = "An error occured in the Row Pre-Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                     raise Exception(scriptErrorMsg)
             self.csvFilePath = ebiScriptObject.csvFilePath              
@@ -3097,16 +2964,6 @@ class Engine():
         attachmentColumnCount = 0
         equellaResourceColumnCount = 0
         
-        self.echo("DEBUG: exportItem called for itemID=%s, itemVersion=%s" % (itemID, itemVersion))
-        self.echo("DEBUG: columnHeadings=%s" % str(self.columnHeadings))
-        self.echo("DEBUG: Number of columns to process: %d" % len(self.columnHeadings))
-        
-        # Debug: print the XML structure to understand what paths are available
-        self.echo("DEBUG: XML root node name: %s" % itemXml.root.nodeName)
-        self.echo("DEBUG: Testing xpath 'item/@id': %s" % str(itemXml.getNode("item/@id")))
-        self.echo("DEBUG: Testing xpath 'item/@version': %s" % str(itemXml.getNode("item/@version")))
-        self.echo("DEBUG: Testing xpath 'item/name': %s" % str(itemXml.getNode("item/name")))
-        
         if self.Skip:
             self.echo("  Skipping item")
             return rowData
@@ -3114,8 +2971,6 @@ class Engine():
         for n in range(0, len(self.columnHeadings)):
             cellValues = []
             delimiter = self.currentColumns[n][self.COLUMN_DELIMITER].strip()
-            
-            self.echo("DEBUG: Processing column %d: '%s', datatype=%s" % (n, self.columnHeadings[n], self.currentColumns[n][self.COLUMN_DATATYPE]))
 
             # get metadata values if column datatype uses an xpath
             values = []
@@ -3124,12 +2979,7 @@ class Engine():
             self.columnHeadings[n].strip() != "" and self.columnHeadings[n].strip()[0] != "#"):
                            
                 # Get all matching values
-                # Strip leading /xml/ if present since EQUELLA XML starts with 'item' node
-                xpath = self.columnHeadings[n]
-                if xpath.startswith("/xml/"):
-                    xpath = xpath[5:]  # Remove '/xml/' prefix
-                self.echo("DEBUG: Using xpath: '%s' (original: '%s')" % (xpath, self.columnHeadings[n]))
-                values = itemXml.getNodes(xpath)
+                values = itemXml.getNodes(self.columnHeadings[n])
                 
                 # detemine how many values to "discount" away (-1 means discount all of them) to
                 # spread repeating values across columns with same xpaths
@@ -3455,7 +3305,7 @@ class Engine():
 
             elif self.currentColumns[n][self.COLUMN_DATATYPE] == self.COLLECTION:
                 collID = itemXml.getNode("item/@itemdefid")
-                collName = next((key for key,value in collectionIDs.items() if value==collID))
+                collName = (key for key,value in collectionIDs.items() if value==collID).next()
                 cellValues = [collName]
 
             elif self.currentColumns[n][self.COLUMN_DATATYPE] == self.ITEMID:
@@ -3473,8 +3323,6 @@ class Engine():
                                                     
             # delimit cell values
             cellValue = delimiter.join(cellValues)
-            
-            self.echo("DEBUG: Column %d cellValues=%s, cellValue='%s'" % (n, str(cellValues), cellValue))
 
             # display to log if necessary
             if self.currentColumns[n][self.COLUMN_DISPLAY] == "YES":
@@ -3483,9 +3331,6 @@ class Engine():
             # populate delimited list of cell values in row data
             if len(cellValues) > 0:
                 rowData[n] = cellValue
-                self.echo("DEBUG: Set rowData[%d] = '%s'" % (n, cellValue))
-            else:
-                self.echo("DEBUG: Column %d has no cellValues, rowData[%d] remains empty" % (n, n))
         
         # add Commands cell
         if commandOptionsColumn != -1:
@@ -3529,7 +3374,7 @@ class Engine():
                     raise
                 else:
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
-                    formattedException = "".join(str(line) for line in traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
+                    formattedException = "".join(traceback.format_exception_only(exceptionType, exceptionValue))[:-1]
                     scriptErrorMsg = "An error occured in the Row Post-Script:\n%s (line %s)" % (formattedException, traceback.extract_tb(exceptionTraceback)[-1][1])
                     raise Exception(scriptErrorMsg)
         if testOnly:
@@ -3555,13 +3400,13 @@ class Engine():
                         deconflictedFilepath = conflictFilepath
                 
         elif overwriteMode == self.OVERWRITENONE:
-            if os.path.isfile(filepath):
+            if os.path.isopen(filepath):
                 conflictFolderNumber = 0
                 conflictFolderUsed = True
                 while conflictFolderUsed:
                     conflictFolderNumber += 1
                     conflictFilepath = os.path.join(os.path.dirname(filepath), str(conflictFolderNumber), os.path.basename(filepath))
-                    if not os.path.isfile(conflictFilepath):
+                    if not os.path.isopen(conflictFilepath):
                         conflictFolderUsed = False
                         if not os.path.exists(os.path.dirname(conflictFilepath)):
                             os.makedirs(os.path.dirname(conflictFilepath))
@@ -3609,7 +3454,7 @@ class Logger:
     def __init__(self, parent):
         self.parent = parent
     def log(self, entry, display = True, log = True):
-        if not isinstance(entry, str):
+        if not isinstance(entry, basestring):
             entry = str(entry)
         self.parent.echo(entry=entry, display=display, log=log, style=3)
 

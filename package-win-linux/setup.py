@@ -1,53 +1,71 @@
-from distutils.core import setup
-import py2exe
-import sys,os
-import ebi
+"""
+Setup script for building EBI Windows executable using PyInstaller
 
-origIsSystemDLL = py2exe.build_exe.isSystemDLL
-def isSystemDLL(pathname):
-    if os.path.basename(pathname).lower() in ("msvcp71.dll", "gdiplus.dll", "msvcp90.dll"): 
-        return 0
-    return origIsSystemDLL(pathname)
-py2exe.build_exe.isSystemDLL = isSystemDLL
+PyInstaller is preferred over py2exe because it:
+- Supports all Python 3.x versions (including 3.10+)
+- Better cross-platform support (Windows, Linux, macOS)
+- Easier configuration and dependency management
+- Active development and maintenance
 
-setup(
-    name = "EQUELLA Bulk Importer (EBI)",
-    version = ebi.Version,      
-    windows=[{"script":"ebi.py","icon_resources":[(0x0004,"ebismall.ico")],"copyright":"Copyright (c) 2014 Pearson plc. All rights reserved."}],
-    options={
-        'py2exe': {
-            "dll_excludes": [
-                "MSVCP90.dll",
-                "api-ms-win-core-string-l1-1-0.dll",
-                "api-ms-win-core-string-obsolete-l1-1-0.dll",
-                "api-ms-win-core-com-l1-1-0.dll",
-                "api-ms-win-core-sysinfo-l1-1-0.dll",
-                "api-ms-win-core-debug-l1-1-0.dll",
-                "api-ms-win-core-profile-l1-1-0.dll",
-                "api-ms-win-core-synch-l1-2-0.dll",
-                "api-ms-win-core-synch-l1-1-0.dll",
-                "api-ms-win-core-errorhandling-l1-1-0.dll",
-                "api-ms-win-core-libraryloader-l1-2-0.dll",
-                "api-ms-win-core-delayload-l1-1-1.dll",
-                "api-ms-win-core-delayload-l1-1-0.dll",
-                "api-ms-win-core-processthreads-l1-1-0.dll",
-                "api-ms-win-core-processenvironment-l1-1-0.dll",
-                "api-ms-win-eventing-provider-l1-1-0.dll",
-                "api-ms-win-core-file-l1-1-0.dll",
-                "api-ms-win-core-memory-l1-1-0.dll",
-                "api-ms-win-core-threadpool-l1-2-0.dll",
-                "api-ms-win-core-localization-l1-2-0.dll",
-                "api-ms-win-core-handle-l1-1-0.dll",
-                "api-ms-win-core-kernel32-legacy-l1-1-0.dll",
-                "api-ms-win-core-heap-l1-1-0.dll",
-                "api-ms-win-core-heap-l2-1-0.dll",
-                "api-ms-win-core-heap-obsolete-l1-1-0.dll",
-                "api-ms-win-security-base-l1-1-0.dll",
-                "api-ms-win-core-libraryloader-l1-2-1.dll",
-                "api-ms-win-core-rtlsupport-l1-1-0.dll"
-            ]
-        }
-    },
-    description = "EQUELLA Bulk Importer for uploading content into the EQUELLA(R) content management system",
-)
+Usage:
+    # Install PyInstaller (if not already installed)
+    pip install pyinstaller
+    
+    # Build the executable
+    python setup.py
+    
+    # Or run PyInstaller directly
+    pyinstaller ebi.spec
+
+Output:
+    dist/ebi.exe - Standalone executable
+"""
+
+import sys
+import os
+import subprocess
+
+def main():
+    """Build EBI executable using PyInstaller"""
+    
+    # Check if PyInstaller is installed
+    try:
+        import PyInstaller
+    except ImportError:
+        print("ERROR: PyInstaller not installed.")
+        print("Install with: pip install pyinstaller")
+        sys.exit(1)
+    
+    # Check if spec file exists
+    spec_file = os.path.join(os.path.dirname(__file__), 'ebi.spec')
+    if not os.path.exists(spec_file):
+        print("ERROR: ebi.spec file not found")
+        print("Run this script from the package-win-linux directory")
+        sys.exit(1)
+    
+    print("="*50)
+    print("Building EQUELLA Bulk Importer with PyInstaller")
+    print("="*50)
+    print()
+    
+    # Run PyInstaller
+    cmd = [sys.executable, '-m', 'PyInstaller', '--clean', 'ebi.spec']
+    print(f"Running: {' '.join(cmd)}")
+    print()
+    
+    result = subprocess.run(cmd, cwd=os.path.dirname(__file__))
+    
+    if result.returncode == 0:
+        print()
+        print("="*50)
+        print("Build successful!")
+        print("Executable: dist/ebi.exe")
+        print("="*50)
+    else:
+        print()
+        print("ERROR: Build failed")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
 
