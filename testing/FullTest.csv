@@ -1,5 +1,5 @@
 metadata/name,metadata/description,metadata/keywords/keyword,metadata/keywords/keyword,metadata/primaryurls/url,metadata/secondaryurls/url,primary url names,secondary url names,metadata/primaryattachments/attachment,attachment_name,metadata/imspackage,package_name,metadata/secondaryattachments/attachment,metadata/@identifier,receipts,attach_name2,Commands,metadata/mixedattachments/attachment,metadata/mixedattachments/attachment,metadata/mixedattachments/attachment,url names,attachment names,attachment names,,metadata/resources/resource,Resource names,Item URL,metadata/contributors,metadata/contributors/contributor[2]/role[2],metadata/contributors/contributor[@id='1']/role[1],metadata/contributors/contributor[1]/file,metadata/contributors/contributor[2]/file,contributor attachment names,contributor attachment names,metadata/testingnulls/child1,metadata/testingnulls/child2,metadata/testingnulls/child3/@attr,metadata/testingnulls/child4/@attr,owner,collaborators,Error
-Attachments and hyperlinks in EQUELLA®,Files and web references uploaded by the EBI. Multiple metadata targets.,"EQUELLA,prints,documents",,,,,,attachments/FordEscape.jpg|attachments/adfa.zip,Ford Escape in Parking Lot|ADFA Zip File,,,attachments/Dining 1.jpg,4,,Dining Room Picture,,,,,,,,ignore,,,,"<contributor id=""1"">
+Attachments and hyperlinks in EQUELLA®,Files and web references uploaded by the EBI. Multiple metadata targets.,"EQUELLA,prints,documents",,,,,,attachments/FordEscape.jpg|attachments/adfa.zip,Ford Escape in Parking Lot|ADFA Zip File,,,attachments/Dining 1.jpg,4,a0d37078-0b34-43ea-8e0a-466d76ddf64c,Dining Room Picture,,,,,,,,ignore,,,https://au.equella.com/demo/items/a0d37078-0b34-43ea-8e0a-466d76ddf64c/1,"<contributor id=""1"">
     <name>Jim Kurian</name>
     <role>Author</role>
 </contributor>
@@ -7,7 +7,7 @@ Attachments and hyperlinks in EQUELLA®,Files and web references uploaded by the 
     <name>Sam Doe</name>
     <role>Editor</role>
 </contributor>",,Proofreader,,,,,,,Test,<null>,1,1|jimk,
-Zip File unzipped and SCORM package,Unzipped zip file,"eCollege, course","extract,software",,,,,attachments/adfa.zip,"((""*"",""*""))",attachments/Assessment_20120208.zip,SCORM Package,,5,,,"AUTO, DRAFT",,,,,,,ignore,,,,"<contributor id=""1"">
+Zip File unzipped and SCORM package,Unzipped zip file,"eCollege, course","extract,software",,,,,attachments/adfa.zip,"((""*"",""*""))",attachments/Assessment_20120208.zip,SCORM Package,,5,78590313-1281-4375-9fe4-9ae5044d3376,,"AUTO, DRAFT",,,,,,,ignore,,,https://au.equella.com/demo/items/78590313-1281-4375-9fe4-9ae5044d3376/1,"<contributor id=""1"">
     <name>Jim Kurian</name>
     <role>Author</role>
 </contributor>
@@ -15,8 +15,8 @@ Zip File unzipped and SCORM package,Unzipped zip file,"eCollege, course","extrac
     <name>Sam Doe</name>
     <role>Editor</role>
 </contributor>",Author,Proofreader,,,,,,<null>,,<null>,,,
-IMS Package,IMS Package,"adfa,course",,,,,,,,attachments/package.zip,IMS Package,,6,,,AUTO,,,,,,,ignore,,,,,,Author,attachments/adfa.zip|attachments/FordEscape.jpg,attachments/Dining 1.jpg,"((""VS Sample.csv"",""VS Sample.csv""),(""images/Spirits.jpg"",""Spirits.jpg""),(""BI-screens.doc"",""BI-screens.doc""),(""start.htm"",""start.htm""),(""images/help.htm"",""help.htm""))",,,,,,,,
-Custom Attachments and URLs,EBI Test of custom attachments,"eCollege, course","software, coursware",http://www.google.com,http://www.equella.com|http://www.pearson.com,Google,EQUELLA|Pearson Plc.,,,,,attachments/package.zip,7,,,"VERSION, DRAFT",,,,,,,,,,,"<contributor id=""1"">
+IMS Package,IMS Package,"adfa,course",,,,,,,,attachments/package.zip,IMS Package,,6,d8c65a99-ccd5-41d6-acb3-7c1f08e8e628,,AUTO,,,,,,,ignore,,,https://au.equella.com/demo/items/d8c65a99-ccd5-41d6-acb3-7c1f08e8e628/1,,,Author,attachments/adfa.zip|attachments/FordEscape.jpg,attachments/Dining 1.jpg,"((""VS Sample.csv"",""VS Sample.csv""),(""images/Spirits.jpg"",""Spirits.jpg""),(""BI-screens.doc"",""BI-screens.doc""),(""start.htm"",""start.htm""),(""images/help.htm"",""help.htm""))",,,,,,,,
+Custom Attachments and URLs,EBI Test of custom attachments,"eCollege, course","software, coursware",http://www.google.com,http://www.equella.com|http://www.pearson.com,Google,EQUELLA|Pearson Plc.,,,,,attachments/package.zip,7,d111bf79-9d36-4655-9de2-51b1e5d1f61d,,"VERSION, DRAFT",,,,,,,,,,https://au.equella.com/demo/items/d111bf79-9d36-4655-9de2-51b1e5d1f61d/1,"<contributor id=""1"">
     <name>Jim Kurian</name>
     <role>Author</role>
 </contributor>
@@ -24,7 +24,7 @@ Custom Attachments and URLs,EBI Test of custom attachments,"eCollege, course","s
     <name>Sam Doe</name>
     <role>Editor</role>
 </contributor>",Author,Proofreader,attachments/FordEscape.jpg|attachments/adfa.zip,attachments/Dining 1.jpg,Ford Escape in Parking Lot|ADFA Zip File,Dining Room Picture,,<null>,,<null>,,,
-URLS and IMS unzipped (no start pages),EBI Test of URLs od unzipped IMS packages,"eCollege,course",,http://www.google.com,http://www.equella.com|http://www.pearson.com,Google,EQUELLA|Pearson Plc.,,,,,,8,,,,,,,,,,,,,,,,,,,,,,,,,,,
-Zip File unzipped,Unzipped zip file,"export,archive,extract,extract,software",,,,,,attachments/adfa.zip,"((""start.htm"",""Start Here""),(""images/help.htm"",""Online Help""))",,,,9,,,UNZIP,,,,,,,,,,,,,,,,,,,,,,,,
-Big Zip File,Big Zip File,,,,,,,attachments/Package2.zip,,,,,10,,,AUTO,,,,,,,,,,,,,,,,,,,,,,,,
-Linked Resources,Item linked to an item and an attachment by source identifier,,,,,,,,,,,,11,,,,,,,,,,,{4}/0|{4}/0/FordEscape.jpg,Linked Item,,,,,,,,,,,,,,,
+URLS and IMS unzipped (no start pages),EBI Test of URLs od unzipped IMS packages,"eCollege,course",,http://www.google.com,http://www.equella.com|http://www.pearson.com,Google,EQUELLA|Pearson Plc.,,,,,,8,0a1c3253-b114-4518-81d1-2381a49425e2,,,,,,,,,,,,https://au.equella.com/demo/items/0a1c3253-b114-4518-81d1-2381a49425e2/1,,,,,,,,,,,,,,
+Zip File unzipped,Unzipped zip file,"export,archive,extract,extract,software",,,,,,attachments/adfa.zip,"((""start.htm"",""Start Here""),(""images/help.htm"",""Online Help""))",,,,9,aa62121c-6c80-4b05-b7ca-ff821bdd11f6,,UNZIP,,,,,,,,,,https://au.equella.com/demo/items/aa62121c-6c80-4b05-b7ca-ff821bdd11f6/1,,,,,,,,,,,,,,
+Big Zip File,Big Zip File,,,,,,,attachments/Package2.zip,,,,,10,10fb19ab-f6ce-4dba-92ae-fc26d4ccd7a3,,AUTO,,,,,,,,,,https://au.equella.com/demo/items/10fb19ab-f6ce-4dba-92ae-fc26d4ccd7a3/1,,,,,,,,,,,,,,
+Linked Resources,Item linked to an item and an attachment by source identifier,,,,,,,,,,,,11,425986d1-4d48-4807-a98f-55bca50835bd,,,,,,,,,,{4}/0|{4}/0/FordEscape.jpg,Linked Item,https://au.equella.com/demo/items/425986d1-4d48-4807-a98f-55bca50835bd/1,,,,,,,,,,,,,,

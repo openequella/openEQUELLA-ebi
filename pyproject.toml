@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openequella-ebi"
+version = "4.73"
+description = "EQUELLA Bulk Importer (EBI) - Tool for importing content into openEQUELLA"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Apereo Foundation", email = ""},
+    {name = "Jim Kurian", email = ""}
+]
+keywords = ["equella", "bulk-importer", "ebi", "content-management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: wxPython",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+]
+dependencies = [
+    "wxPython>=4.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "PyInstaller>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/openequella/openEQUELLA-ebi"
+Documentation = "https://openequella.github.io/equella-tools/bulkImporterUserManual.html"
+Repository = "https://github.com/openequella/openEQUELLA-ebi.git"
+"Bug Tracker" = "https://github.com/openequella/openEQUELLA-ebi/issues"
+
+[tool.setuptools]
+packages = ["ebi"]

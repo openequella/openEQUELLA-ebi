@@ -178,7 +178,15 @@ class Engine():
         elif system == "Darwin":
             ebiPlatform += ", Mac OS " + platform.mac_ver()[0]
         elif system == "Linux":
-            ebiPlatform += ", " + platform.linux_distribution()[0] + " " + platform.linux_distribution()[1]
+            # Use freedesktop_os_release() for Python 3.10+ or fallback for older versions
+            try:
+                if hasattr(platform, 'freedesktop_os_release'):
+                    os_info = platform.freedesktop_os_release()
+                    ebiPlatform += ", " + os_info.get('NAME', 'Linux') + " " + os_info.get('VERSION', '').strip()
+                else:
+                    ebiPlatform += ", Linux " + platform.release()
+            except Exception:
+                ebiPlatform += ", Linux " + platform.release()
         return ebiPlatform
         
     def setDebug(self, debug):

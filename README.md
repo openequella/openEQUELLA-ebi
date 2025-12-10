@@ -39,6 +39,21 @@ pip3 install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubunt
 pip3 install wxPython
 ```
 
+### Installing PyInstaller
+To compile the EBI as a standalone package for Windows or Macintosh, PyInstaller must be installed in your Python 3 environment:
+
+```bash
+pip3 install PyInstaller
+```
+
+Alternatively, you can install it as part of the development dependencies:
+
+```bash
+# Install all project dependencies including PyInstaller
+pip3 install -r requirements.txt
+pip3 install PyInstaller
+```
+
 The latest release of MS Windows version does not require installing Python or wxPython.
 To run the EBI on Linux and Mac, or running from source files (as required on Linux), both Python 3.8+ and wxPython must be installed.
 
