@@ -18,6 +18,7 @@
 # detailed usage instructions and troubleshooting tips.
 
 # system settings (do not change!)
+# system settings (do not change!)
 Version = "4.73"
 Copyright = """
 Copyright (c) 2024, The Apereo Foundation
@@ -103,7 +104,7 @@ License = """
       on behalf of whom a Contribution has been received by Licensor and
       subsequently incorporated within the Work.
 
-   2. Grant of Copyright License. Subject to the terms and conditions of
+      "Grant of Copyright License. Subject to the terms and conditions of
       this License, each Contributor hereby grants to You a perpetual,
       worldwide, non-exclusive, no-charge, royalty-free, irrevocable
       copyright license to reproduce, prepare Derivative Works of,

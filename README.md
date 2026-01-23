@@ -9,7 +9,14 @@ User guide can be found at: https://openequella.github.io/equella-tools/bulkImpo
 **Note**: This project has been migrated from Python 2 to Python 3. See [PYTHON3_MIGRATION.md](PYTHON3_MIGRATION.md) for details.
 
 ## Dependencies
-The EBI requires **Python 3.8+** and the GUI framework wxPython.
+The EBI requires both Python 3.x and the GUI framework wxPython 4.x.
+The latest release of MS Windows version does not require Python nor wxPython to be installed.
+To run the EBI on Linux and Mac, or running from source files (as required on Linux) both Python 3.x and wxPython 4.x must be installed.
+On Linux, wxPython requires GTK+ 3 libraries to be present.
+
+To make modifications to and test EBI, Python 3.x and wxPython 4.x must be installed on the developer’s workstation. To compile the EBI as a standalone package then, as well as Python 3.x and wxPython 4.x, one of the following is required on the workstation:
+* py2exe (for Windows), or
+* py2app (for Macintosh)
 
 ### Quick Setup
 ```bash
@@ -29,7 +36,7 @@ pip3 install wxPython
 
 #### Linux (Ubuntu/Debian)
 ```bash
-sudo apt-get install python3-wxgtk4.0
+sudo apt-get install build-essential gettext python3-dev libgtk-3-dev python3-wxgtk4.0
 # Or:
 pip3 install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04 wxPython
 ```

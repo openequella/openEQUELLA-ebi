@@ -18,6 +18,8 @@ import OptionsDialog
 import csv, codecs, io
 import random, platform
 import Engine
+import Constants
+import Utils
 from xml.dom.minidom import Document, parse, parseString
 import urllib.request, urllib.error, urllib.parse
 import configparser
@@ -768,39 +770,39 @@ class MainFrame(wx.Frame):
 
     def __init__(self, parent):
         # constants
-        self.METADATA = 'Metadata'
-        self.ATTACHMENTLOCATIONS = 'Attachment Locations'
-        self.ATTACHMENTNAMES = 'Attachment Names'
-        self.CUSTOMATTACHMENTS = 'Custom Attachments'
-        self.RAWFILES = 'Raw Files'
-        self.URLS = 'URLs'
-        self.HYPERLINKNAMES = 'Hyperlink Names'
-        self.EQUELLARESOURCES = 'EQUELLA Resources'
-        self.EQUELLARESOURCENAMES = 'EQUELLA Resource Names'        
-        self.COMMANDS = 'Commands'
-        self.TARGETIDENTIFIER = 'Target Identifier'
-        self.TARGETVERSION = 'Target Version'
-        self.COLLECTION = 'Collection'
-        self.OWNER = 'Owner'
-        self.COLLABORATORS = 'Collaborators'
-        self.ITEMID = 'Item ID'
-        self.ITEMVERSION = 'Item Version'
-        self.THUMBNAILS = 'Thumbnails'
-        self.SELECTEDTHUMBNAIL = 'Selected Thumbnail'
-        self.ROWERROR = 'Row Error'
-        self.IGNORE = 'Ignore'
+        self.METADATA = Constants.METADATA
+        self.ATTACHMENTLOCATIONS = Constants.ATTACHMENTLOCATIONS
+        self.ATTACHMENTNAMES = Constants.ATTACHMENTNAMES
+        self.CUSTOMATTACHMENTS = Constants.CUSTOMATTACHMENTS
+        self.RAWFILES = Constants.RAWFILES
+        self.URLS = Constants.URLS
+        self.HYPERLINKNAMES = Constants.HYPERLINKNAMES
+        self.EQUELLARESOURCES = Constants.EQUELLARESOURCES
+        self.EQUELLARESOURCENAMES = Constants.EQUELLARESOURCENAMES        
+        self.COMMANDS = Constants.COMMANDS
+        self.TARGETIDENTIFIER = Constants.TARGETIDENTIFIER
+        self.TARGETVERSION = Constants.TARGETVERSION
+        self.COLLECTION = Constants.COLLECTION
+        self.OWNER = Constants.OWNER
+        self.COLLABORATORS = Constants.COLLABORATORS
+        self.ITEMID = Constants.ITEMID
+        self.ITEMVERSION = Constants.ITEMVERSION
+        self.THUMBNAILS = Constants.THUMBNAILS
+        self.SELECTEDTHUMBNAIL = Constants.SELECTEDTHUMBNAIL
+        self.ROWERROR = Constants.ROWERROR
+        self.IGNORE = Constants.IGNORE
         
-        self.COLUMN_POS = "Pos"
-        self.COLUMN_HEADING = "Column Heading"
-        self.COLUMN_DATATYPE = "Column Data Type"
-        self.COLUMN_DISPLAY = "Display"
-        self.COLUMN_SOURCEIDENTIFIER = "Source Identifier"
-        self.COLUMN_XMLFRAGMENT = "XML Fragment"
-        self.COLUMN_DELIMITER = "Delimiter"
+        self.COLUMN_POS = Constants.COLUMN_POS
+        self.COLUMN_HEADING = Constants.COLUMN_HEADING
+        self.COLUMN_DATATYPE = Constants.COLUMN_DATATYPE
+        self.COLUMN_DISPLAY = Constants.COLUMN_DISPLAY
+        self.COLUMN_SOURCEIDENTIFIER = Constants.COLUMN_SOURCEIDENTIFIER
+        self.COLUMN_XMLFRAGMENT = Constants.COLUMN_XMLFRAGMENT
+        self.COLUMN_DELIMITER = Constants.COLUMN_DELIMITER
         
-        self.OVERWRITENONE = 0
-        self.OVERWRITEEXISTING = 1
-        self.OVERWRITEALL = 2
+        self.OVERWRITENONE = Constants.OVERWRITENONE
+        self.OVERWRITEEXISTING = Constants.OVERWRITEEXISTING
+        self.OVERWRITEALL = Constants.OVERWRITEALL
         
         # globals
         self.version = ""
@@ -1076,22 +1078,12 @@ class MainFrame(wx.Frame):
             
             self.mainStatusBar.SetStatusText("Ready", 0)              
         
-    def unicode_csv_reader(self, utf8_data, encoding, dialect=csv.excel, **kwargs):
-        csv_reader = csv.reader(utf8_data, dialect=dialect, **kwargs)
-        firstRow = True
-        for row in csv_reader:
-            # remove BOM for utf-8 (Python 3: strings already decoded)
-            if firstRow:
-                if len(row) > 0 and row[0] and row[0].startswith('\ufeff'):  # BOM as Unicode char
-                    row[0] = row[0][1:]
-                firstRow = False
 
-            yield row  # Python 3: csv.reader already returns strings
     
     def LoadCSV(self):
         self.mainStatusBar.SetStatusText("Loading CSV...", 0)
         
-        reader = self.unicode_csv_reader(open(self.getCSVPath(), "r", encoding=self.cmbEncoding.GetStringSelection(), newline=''), self.cmbEncoding.GetStringSelection())
+        reader = Utils.unicode_csv_reader(open(self.getCSVPath(), "r", encoding=self.cmbEncoding.GetStringSelection(), newline=''), self.cmbEncoding.GetStringSelection())
         
         # store the rows of the CSV in an array
         csvArray = []
@@ -1107,7 +1099,7 @@ class MainFrame(wx.Frame):
         
     def verifyCurrentColumnsMatchCSV(self):
         if self.txtCSVPath.GetValue() != "" and not os.path.isdir(self.txtCSVPath.GetValue()):
-            reader = self.unicode_csv_reader(open(self.getCSVPath(), "r", encoding=self.cmbEncoding.GetStringSelection(), newline=''), self.cmbEncoding.GetStringSelection())
+            reader = Utils.unicode_csv_reader(open(self.getCSVPath(), "r", encoding=self.cmbEncoding.GetStringSelection(), newline=''), self.cmbEncoding.GetStringSelection())
             
             # store the first row of the CSV in an array
             csvHeadings = []

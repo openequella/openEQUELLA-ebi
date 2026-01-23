@@ -294,19 +294,7 @@ class TLEClient:
                 added_cookie.append(name)
 
             # Python 3: get_all() returns all Set-Cookie headers (there may be multiple)
-            all_set_cookies = responseInfo.get_all('set-cookie')
-            if all_set_cookies:
-                for cookie in all_set_cookies:
-                    if cookie is not None:
-                        for cookie_part in cookie.split(','):
-                            for cookie_name in cookie_part.split(','):
-                                name = cookie_name.upper().split("=")[0].strip()
-                                if ";" in name:
-                                    name = name.split(";")[1].strip()
-                                if not name in ["PATH", "DOMAIN", "EXPIRES", "SECURE", "HTTPONLY"] and not name in added_cookie:
-                                    # save cookie
-                                    self._cookieJar.append(cookie_name)
-                                    added_cookie.append(name)
+            self._process_response_cookies(responseInfo, added_cookie)
 
             if self.owner.networkLogging:
                 self.owner.echo("HTTP RESPONSE:\n")
@@ -412,6 +400,23 @@ class TLEClient:
             self.owner.echo("--------------------- END COMMUNICATION ---------------------")
             self.owner.echo("*************************************************************\n\n")
 
+
+
+    def _process_response_cookies(self, response_info, known_cookie_names):
+        """ Extracts and stores valid cookies from response headers. Filters out reserved keywords and duplicates. """
+        RESERVED_KEYS = {"PATH", "DOMAIN", "EXPIRES", "SECURE", "HTTPONLY"}
+        # Declaratively flatten headers -> parts -> stripped strings
+        headers = response_info.get_all('set-cookie') or []
+        cookie_parts = ( part.strip() for header in headers if header for part in header.split(',') )
+        for cookie in cookie_parts:
+            if not cookie: continue
+            # Isolate name extraction logic
+            key_segment = cookie.split("=")[0].strip().upper()
+            name = key_segment.split(";")[1].strip() if ";" in key_segment else key_segment
+            # Filter negative conditionals by checking membership
+            if name not in RESERVED_KEYS and name not in known_cookie_names:
+                self._cookieJar.append(cookie)
+                known_cookie_names.append(name)
 
     def _createSoapSessionFromToken (self, token):
         result = self._call ('loginWithToken', (
@@ -893,131 +898,102 @@ class NewItemClient:
 
     # Upload a file as an attachment to this item. path is where the item will live inside of the repository, and should not contain a preceding slash.
     # e.g. item.attachFile ('support/song.wav', file ('c:\\Documents and Settings\\adame\\Desktop\\song.wav', 'rb'))
-    def attachFile (self, path, attachment, showstatus=None, chunk_size=(1024 * 2048)):
-        """Upload a file to the item in the current editing session.
+    def attachFile(self, path, attachment, show_status=None, chunk_size=(1024 * 2048)):
+        """ Orchestrates the file upload process. Focuses on flow control rather than implementation details. """
+        self._validate_attachment(attachment) # Fail fast
         
-        Files are uploaded in chunks (default 16MB). Parent directories are automatically created as required.
-        
-        Args:
-            path: Server path for the file (e.g. 'support/song.wav')
-            attachment: File object opened in binary read mode
-            showstatus: Optional status message prefix for progress reporting
-            chunk_size: Upload chunk size in bytes (default 2MB)
-        
-        Example:
-            item.attachFile('support/song.wav', open('video.avi', 'rb'), '     Progress: ')
-        """
-        # Validate attachment object
+        try:
+            file_size = os.path.getsize(attachment.name)
+        except OSError as e:
+            raise Exception(f"Cannot access file '{attachment.name}': {e}")
+
+        uploaded_bytes = 0
+        self._notify_progress(show_status, "Uploading...", 0, file_size)
+
+        try:
+            # enumerate gives us an index to determine first_chunk cleanly
+            for i, chunk in enumerate(self.read_in_chunks(attachment, chunk_size)):
+                # 1. Handle User Interruption
+                wx.GetApp().Yield()
+                if self.owner.StopProcessing:
+                    self._notify_halt(show_status)
+                    break
+
+                # 2. Upload Logic
+                encoded_chunk = b2a_base64(chunk).decode('ascii').strip()
+                is_first_chunk = (i == 0)
+                # Convert boolean to string for SOAP call if necessary, assuming "true"/"false" strings
+                first_chunk_str = "true" if is_first_chunk else "false"
+                self.parClient._uploadFile(self.stagingid, path, encoded_chunk, first_chunk_str)
+
+                # 3. Update State
+                uploaded_bytes += len(chunk)
+                self._notify_progress(show_status, "Uploading...", uploaded_bytes, file_size)
+
+        except Exception:
+            # Ensure newline on error if writing to stdout, then re-raise
+            if not self.debug and sys.stdout:
+                print()
+            raise
+
+    def _validate_attachment(self, attachment):
+        """Encapsulates boundary conditions"""
         if attachment is None:
             raise Exception("Attachment file object is None")
-        
-        if not hasattr(attachment, 'read'):
+        if not hasattr(attachment, 'read') or not hasattr(attachment, 'name'):
             raise Exception("Attachment is not a valid file object")
-        
-        if not hasattr(attachment, 'name'):
-            raise Exception("Attachment file object does not have a 'name' attribute")
-        
-        if showstatus:
-            if self.debug:
-                self.owner.echo(showstatus + " Uploading...")
-            else:
-                try:
-                    if self.owner.log is not None:
-                        self.owner.log.SetReadOnly(False)
-                        self.owner.log.AppendText(showstatus + " Uploading...")
-                        self.owner.log.SetReadOnly(True)
-                except Exception as e:
-                    pass
-                
-                try:
-                    if sys.stdout is not None:
-                        sys.stdout.write(showstatus + " Uploading...")
-                        sys.stdout.flush()
-                except Exception as e:
-                    pass
-        try:
-            firstChunk = "true"
-            # Get file size with better error handling
-            try:
-                filesize = os.path.getsize(attachment.name)
-            except (OSError, IOError) as e:
-                raise Exception("Cannot access file '{}': {}".format(attachment.name, str(e)))
+
+    def _notify_progress(self, prefix, state, current, total):
+        """ Isolates UI/Logging side effects from business logic. """
+        if not prefix:
+            return
             
-            uploaded = 0
+        percent = (current * 100) // total if total > 0 else 0
+        message = f"{prefix} {state}"
+
+        if self.debug:
+            # Simplified debug reporting
+            report = f"{message} chunk uploaded. {current}/{total} ({percent}%)"
+            self.owner.echo(report)
+            if current >= total:
+                self.owner.echo(" Done")
+            self.owner.tryPausing(" [Paused]")
+        else:
+            # Production logging/stdout reporting
+            status_line = f"{message}{percent}%" if current < total else f"{message}Done"
+            self._write_to_logs(status_line)
+            self._write_to_stdout("." if current < total else "Done\n")
+            self.owner.tryPausing(" [Paused]", newline=True)
+
+    def _notify_halt(self, prefix):
+        """Specific handler for user cancellation."""
+        msg = f"{prefix} Halted by user" if prefix else "Halted by user"
+        
+        if self.debug:
+            self.owner.echo(msg)
+        else:
+            self._write_to_logs("\n")
+            self._write_to_stdout("Halted by user\n")
+            self.owner.echo(msg, False)
+
+    def _write_to_logs(self, text):
+        """Helper to handle the verbose log object locking/unlocking."""
+        if self.owner.log:
+            self.owner.log.SetReadOnly(False)
+            # If it's a progress update, replace the line, otherwise append
+            if "Uploading..." in text and not text.endswith("Done"):
+                self.owner.log.DelLineLeft()
+            self.owner.log.AppendText(text)
+            self.owner.log.SetReadOnly(True)
+
+    def _write_to_stdout(self, text):
+        """Safe stdout wrapper."""
+        if sys.stdout:
             try:
-                for chunk in self.read_in_chunks(attachment, chunk_size):
-                    wx.GetApp().Yield()
-                    if self.owner.StopProcessing:
-                        if self.debug:
-                            self.owner.echo(showstatus + " Halted by user")
-                        else:
-                            if self.owner.log is not None:
-                                self.owner.log.SetReadOnly(False)
-                                self.owner.log.AppendText("\n")
-                                self.owner.log.SetReadOnly(True)
-
-                            try:
-                                if sys.stdout is not None:
-                                    sys.stdout.write("Halted by user\n")
-                            except Exception as e:
-                                pass
-                            self.owner.echo(showstatus + " Uploading...Halted by user", False)
-                        break
-                    uploaded += len(chunk)
-                    encodedChunk = b2a_base64(chunk).decode('ascii').strip()
-                    
-                    self.parClient._uploadFile (self.stagingid, path, encodedChunk, firstChunk)
-
-                    if firstChunk == "true":
-                        firstChunk = "false"
-                    if showstatus:
-                        if self.debug:
-                            progressReport = showstatus + " chunk=%s, uploaded=%s/%s" % (len(chunk), uploaded, filesize)
-                            self.owner.echo(progressReport)
-                            if uploaded >= filesize:
-                                self.owner.echo("    Done")
-                            self.owner.tryPausing("    [Paused]")
-                        else:
-                            if uploaded >= filesize:
-                                self.owner.echo(showstatus + " Uploading...Done", False)
-                                try:
-                                    if sys.stdout is not None:
-                                        sys.stdout.write("Done\n")
-                                except Exception as e:
-                                    self.owner.echo("DEBUG: Error writing to stdout: %s" % str(e))
-
-                                if self.owner.log is not None:
-                                    self.owner.log.DocumentEnd()
-                                    self.owner.log.SetReadOnly(False)
-                                    self.owner.log.DelLineLeft()
-                                    self.owner.log.AppendText(showstatus + " Uploading...Done\n")
-                                    self.owner.log.SetReadOnly(True)
-                            else:
-                                try:
-                                    if sys.stdout is not None:
-                                        sys.stdout.write(".")
-                                        sys.stdout.flush()
-                                except Exception as e:
-                                    pass
-
-                                progressString = showstatus + " Uploading...%s%%" % ((uploaded * 100)/ filesize)
-                                if self.owner.log is not None:
-                                    self.owner.log.DocumentEnd()
-                                    self.owner.log.SetReadOnly(False)
-                                    self.owner.log.DelLineLeft()
-                                    self.owner.log.AppendText(progressString)
-                                    self.owner.log.SetReadOnly(True)
-                                self.owner.tryPausing("    [Paused]", newline = True)
-            except Exception as chunkError:
-                raise
-        except Exception as uploadError:
-            if not self.debug:
-                try:
-                    if sys.stdout is not None:
-                        sys.stdout.write("\n")
-                except Exception as e:
-                    pass
-            raise
+                sys.stdout.write(text)
+                sys.stdout.flush()
+            except Exception:
+                pass
 
     def unzipFile (self, path, name):
         """Unzip a previously uploaded file on the EQUELLA server.
@@ -1185,6 +1161,7 @@ class NewItemClient:
         attachment.createNode("description", description)
         if uuid != '':
             attachment.createNode("uuid", uuid)
+
     def addStartPageWithZipAttribute(self, description, path, size=1024, uuid='', zipParentUUID=''):
         """Add extracted file attachment with ZIP_ATTACHMENT_UUID reference to parent zip.
         

@@ -20,46 +20,49 @@ import zipfile, glob, time, getpass, uuid
 import urllib.parse
 import wx
 
+import Constants
+import Utils
+
 class Engine():
     def __init__(self, owner, Version, Copyright):
         # constants
-        self.METADATA = 'Metadata'
-        self.ATTACHMENTLOCATIONS = 'Attachment Locations'
-        self.ATTACHMENTNAMES = 'Attachment Names'
-        self.CUSTOMATTACHMENTS = 'Custom Attachments'
-        self.RAWFILES = 'Raw Files'
-        self.URLS = 'URLs'
-        self.HYPERLINKNAMES = 'Hyperlink Names'
-        self.EQUELLARESOURCES = 'EQUELLA Resources'
-        self.EQUELLARESOURCENAMES = 'EQUELLA Resource Names'
-        self.COMMANDS = 'Commands'
-        self.TARGETIDENTIFIER = 'Target Identifier'
-        self.TARGETVERSION = 'Target Version'
-        self.COLLECTION = 'Collection'
-        self.OWNER = 'Owner'
-        self.COLLABORATORS = 'Collaborators'
-        self.ITEMID = 'Item ID'
-        self.ITEMVERSION = 'Item Version'
-        self.ROWERROR = 'Row Error'
-        self.THUMBNAILS = "Thumbnails"
-        self.SELECTEDTHUMBNAIL = "Selected Thumbnail"
-        self.IGNORE = 'Ignore'
+        self.METADATA = Constants.METADATA
+        self.ATTACHMENTLOCATIONS = Constants.ATTACHMENTLOCATIONS
+        self.ATTACHMENTNAMES = Constants.ATTACHMENTNAMES
+        self.CUSTOMATTACHMENTS = Constants.CUSTOMATTACHMENTS
+        self.RAWFILES = Constants.RAWFILES
+        self.URLS = Constants.URLS
+        self.HYPERLINKNAMES = Constants.HYPERLINKNAMES
+        self.EQUELLARESOURCES = Constants.EQUELLARESOURCES
+        self.EQUELLARESOURCENAMES = Constants.EQUELLARESOURCENAMES
+        self.COMMANDS = Constants.COMMANDS
+        self.TARGETIDENTIFIER = Constants.TARGETIDENTIFIER
+        self.TARGETVERSION = Constants.TARGETVERSION
+        self.COLLECTION = Constants.COLLECTION
+        self.OWNER = Constants.OWNER
+        self.COLLABORATORS = Constants.COLLABORATORS
+        self.ITEMID = Constants.ITEMID
+        self.ITEMVERSION = Constants.ITEMVERSION
+        self.ROWERROR = Constants.ROWERROR
+        self.THUMBNAILS = Constants.THUMBNAILS
+        self.SELECTEDTHUMBNAIL = Constants.SELECTEDTHUMBNAIL
+        self.IGNORE = Constants.IGNORE
         
-        self.COLUMN_POS = "Pos"
-        self.COLUMN_HEADING = "Column Heading"
-        self.COLUMN_DATATYPE = "Column Data Type"
-        self.COLUMN_DISPLAY = "Display"
-        self.COLUMN_SOURCEIDENTIFIER = "Source Identifier"
-        self.COLUMN_XMLFRAGMENT = "XML Fragment"
-        self.COLUMN_DELIMITER = "Delimiter"      
+        self.COLUMN_POS = Constants.COLUMN_POS
+        self.COLUMN_HEADING = Constants.COLUMN_HEADING
+        self.COLUMN_DATATYPE = Constants.COLUMN_DATATYPE
+        self.COLUMN_DISPLAY = Constants.COLUMN_DISPLAY
+        self.COLUMN_SOURCEIDENTIFIER = Constants.COLUMN_SOURCEIDENTIFIER
+        self.COLUMN_XMLFRAGMENT = Constants.COLUMN_XMLFRAGMENT
+        self.COLUMN_DELIMITER = Constants.COLUMN_DELIMITER      
         
-        self.CLEARMETA = 0  
-        self.REPLACEMETA = 1
-        self.APPENDMETA = 2
-
-        self.OVERWRITENONE = 0
-        self.OVERWRITEEXISTING = 1
-        self.OVERWRITEALL = 2
+        self.CLEARMETA = Constants.CLEARMETA  
+        self.REPLACEMETA = Constants.REPLACEMETA
+        self.APPENDMETA = Constants.APPENDMETA
+        
+        self.OVERWRITENONE = Constants.OVERWRITENONE
+        self.OVERWRITEEXISTING = Constants.OVERWRITEEXISTING
+        self.OVERWRITEALL = Constants.OVERWRITEALL
                 
         self.pause = False
         self.owner = owner
@@ -82,7 +85,7 @@ class Engine():
         self.maxRetry = 5
 
         # welcome message for command prompt and log files
-        self.welcomeLine1 = "EQUELLA Bulk Importer [EBI %s, %s]" % (Version, self.getPlatform())
+        self.welcomeLine1 = "EQUELLA Bulk Importer [EBI %s, %s]" % (Version, Utils.getPlatform())
         self.welcomeLine2 = self.copyright + "\n"
 
         print(self.welcomeLine1)
@@ -217,35 +220,6 @@ class Engine():
             print(entry)
         return
     
-    def openFileForReading(self, filepath):
-        """Safely open a file for binary reading with proper error handling.
-        
-        Args:
-            filepath: Full path to the file to open
-            
-        Returns:
-            File object opened in binary read mode
-            
-        Raises:
-            Exception: If file doesn't exist or cannot be opened
-        """
-        try:
-            # Final validation before opening
-            if not os.path.exists(filepath):
-                raise FileNotFoundError("File does not exist: '%s'" % filepath)
-            
-            if not os.path.isfile(filepath):
-                raise IsADirectoryError("Path is a directory, not a file: '%s'" % filepath)
-            
-            if not os.access(filepath, os.R_OK):
-                raise PermissionError("Cannot read file: '%s' (permission denied)" % filepath)
-            
-            # Open file
-            file_obj = open(filepath, "rb")
-            return file_obj
-            
-        except Exception as e:
-            raise Exception("Failed to open file '%s': %s" % (filepath, str(e)))
 
     def translateError(self, rawError, context = ""):
         
@@ -611,36 +585,15 @@ class Engine():
 
         return
                
-    def removeDuplicates(self, seq, idfun=None): 
-        # order preserving
-        if idfun is None:
-            def idfun(x): return x
-        seen = {}
-        result = []
-        for item in seq:
-            marker = idfun(item)
-            if marker in seen: continue
-            seen[marker] = 1
-            result.append(item)
-        return result
-    
-    def unicode_csv_reader(self, utf8_data, encoding, dialect=csv.excel, **kwargs):
-        csv_reader = csv.reader(utf8_data, dialect=dialect, **kwargs)
-        firstRow = True
-        for row in csv_reader:
-            # remove BOM for utf-8 (Python 3: strings already decoded)
-            if firstRow:
-                if row[0] and row[0].startswith('\ufeff'):  # BOM as Unicode char
-                    row[0] = row[0][1:]
-                firstRow = False
 
-            yield row  # Python 3: csv.reader already returns strings
+    
+
                 
     def loadCSV(self, owner=None):
         self.csvArray = []
         if owner == None or owner.txtCSVPath.GetValue() != "":
             if not os.path.isdir(self.csvFilePath):
-                reader = self.unicode_csv_reader(open(self.csvFilePath, "r", encoding=self.encoding, newline=''), self.encoding)
+                reader = Utils.unicode_csv_reader(open(self.csvFilePath, "r", encoding=self.encoding, newline=''), self.encoding)
                 for row in reader:
                     self.csvArray.append(row)
                     
@@ -799,7 +752,7 @@ class Engine():
                         scheduledRows.extend(range(int(rows[0]), int(rows[1]) + 1))
                 
                 # remove any duplicates (preserving order)
-                scheduledRows = self.removeDuplicates(scheduledRows)
+                scheduledRows = Utils.removeDuplicates(scheduledRows)
 
                 # determine how many rows to be processed
                 rowsToBeProcessedCount = 0
@@ -1014,7 +967,7 @@ class Engine():
                     
                 # open csv writer and output orginal csv rows using self.columnHeadings as first row (instead of first row of self.csvArray)
                 f = open(receiptFilename, "w", encoding=self.encoding, newline='')
-                writer = UnicodeWriter(f, self.encoding)
+                writer = Utils.UnicodeWriter(f, self.encoding)
                 writer.writerow(list(self.columnHeadings))
                 self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: Writing header row with %d columns" % len(self.columnHeadings))
                 for i in range(1, len(self.csvArray)):
@@ -1063,7 +1016,7 @@ class Engine():
         if (not testOnly or rowErrorColumn != -1) and not os.path.isdir(self.csvFilePath):
             self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "Writing CSV file back to: %s" % self.csvFilePath)
             with open(self.csvFilePath, "w", encoding=self.encoding, newline='') as f:
-                writer = UnicodeWriter(f, self.encoding)
+                writer = Utils.UnicodeWriter(f, self.encoding)
                 writer.writerows(self.csvArray)
                 f.flush()
                 os.fsync(f.fileno())
@@ -1229,6 +1182,63 @@ class Engine():
         else:
             raise Exception("No metadata targets for holding items found in this portion")
     
+    def _processUnzipAttachment(self, item, filename, filepath, filesize, attachmentLinkName, uploadStatus, n, zfobj, testOnly, columnHeading=None):
+        """Process UNZIP command: upload zip, unzip on server, add extracted files as attachments with ZIP_ATTACHMENT_UUID references.
+        
+        Expected format for attachment names: (("file1.pdf", "Description 1"), ("file2.pdf", "Description 2"))
+        Special format "*" includes all files in zip.
+        Original zip file is always added as the first attachment.
+        """
+        self.echo("    Unzip file")
+        if not testOnly:
+            attemptingUpload = True
+            item.attachFile('_zips/' + filename, Utils.openFileForReading(filepath), uploadStatus, self.chunkSize)
+            if self.StopProcessing:
+                return
+            attemptingUpload = False
+            wx.GetApp().Yield()
+            item.unzipFile('_zips/' + filename, filename)
+
+        if attachmentLinkName != "":
+            try:
+                startPagesListAsString = "((\"#####\",\"#####\")," + attachmentLinkName[1:]
+                exec_dict = {}
+                exec("startPagesList = " + startPagesListAsString, exec_dict)
+                startPagesList = exec_dict['startPagesList']
+            except Exception:
+                raise Exception("List of links to unzipped files incorrectly formatted.")
+            
+            parentZipAttachmentUUID = str(uuid.uuid4())
+            
+            zipAttachmentUUID = str(uuid.uuid4())
+            item.addStartPage(filename, "_zips/" + filename, filesize, zipAttachmentUUID)
+            
+            if self.attachmentMetadataTargets and columnHeading:
+                item.getXml().createNode(columnHeading, zipAttachmentUUID)
+            
+            startPagesDict = {}
+            for startPage in startPagesList:
+                if startPage[0] != "#####":
+                    startPagesDict[startPage[0]] = startPage[1]
+
+            for startPage in startPagesList:
+                if startPage[0] == filename:
+                    pass
+                elif startPage[0] == "*":
+                    for archiveFile in zfobj.namelist():
+                        if (archiveFile not in startPagesDict) and (archiveFile != filename) and not archiveFile.endswith("/"):
+                            archiveFilesize = zfobj.getinfo(archiveFile).file_size
+                            attachmentUUID = str(uuid.uuid4())
+                            item.addStartPageWithZipAttribute(os.path.basename(archiveFile), filename + "/" + archiveFile, archiveFilesize, attachmentUUID, parentZipAttachmentUUID)
+                            if self.attachmentMetadataTargets and columnHeading:
+                                item.getXml().createNode(columnHeading, attachmentUUID)
+                elif startPage[0] in startPagesDict:
+                    archiveFilesize = zfobj.getinfo(startPage[0]).file_size
+                    attachmentUUID = str(uuid.uuid4())
+                    item.addStartPageWithZipAttribute(startPage[1], filename + "/" + startPage[0], archiveFilesize, attachmentUUID, parentZipAttachmentUUID)
+                    if self.attachmentMetadataTargets and columnHeading:
+                        item.getXml().createNode(columnHeading, attachmentUUID)
+
     def processRow(self,
                    rowCounter,
                    meta,
@@ -1263,62 +1273,7 @@ class Engine():
         """
                        
 
-        def unzipAttachment():
-            """Process UNZIP command: upload zip, unzip on server, add extracted files as attachments with ZIP_ATTACHMENT_UUID references.
-            
-            Expected format for attachment names: (("file1.pdf", "Description 1"), ("file2.pdf", "Description 2"))
-            Special format "*" includes all files in zip.
-            Original zip file is always added as the first attachment.
-            """
-            self.echo("    Unzip file")
-            if not testOnly:
-                attemptingUpload = True
-                item.attachFile('_zips/' + filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
-                if self.StopProcessing:
-                    return
-                attemptingUpload = False
-                wx.GetApp().Yield()
-                item.unzipFile('_zips/' + filename, filename)
 
-            if attachmentLinkName != "":
-                try:
-                    startPagesListAsString = "((\"#####\",\"#####\")," + attachmentLinkName[1:]
-                    exec_dict = {}
-                    exec("startPagesList = " + startPagesListAsString, exec_dict)
-                    startPagesList = exec_dict['startPagesList']
-                except:
-                    raise Exception("List of links to unzipped files incorrectly formatted.")
-                
-                parentZipAttachmentUUID = str(uuid.uuid4())
-                
-                zipAttachmentUUID = str(uuid.uuid4())
-                item.addStartPage(filename, "_zips/" + filename, filesize, zipAttachmentUUID)
-                
-                if self.attachmentMetadataTargets:
-                    item.getXml().createNode(self.columnHeadings[n], zipAttachmentUUID)
-                
-                startPagesDict = {}
-                for startPage in startPagesList:
-                    if startPage[0] != "#####":
-                        startPagesDict[startPage[0]] = startPage[1]
-
-                for startPage in startPagesList:
-                    if startPage[0] == filename:
-                        pass
-                    elif startPage[0] == "*":
-                        for archiveFile in zfobj.namelist():
-                            if (archiveFile not in startPagesDict) and (archiveFile != filename) and not archiveFile.endswith("/"):
-                                archiveFilesize = zfobj.getinfo(archiveFile).file_size
-                                attachmentUUID = str(uuid.uuid4())
-                                item.addStartPageWithZipAttribute(os.path.basename(archiveFile), filename + "/" + archiveFile, archiveFilesize, attachmentUUID, parentZipAttachmentUUID)
-                                if self.attachmentMetadataTargets:
-                                    item.getXml().createNode(self.columnHeadings[n], attachmentUUID)
-                    elif startPage[0] in startPagesDict:
-                        archiveFilesize = zfobj.getinfo(startPage[0]).file_size
-                        attachmentUUID = str(uuid.uuid4())
-                        item.addStartPageWithZipAttribute(startPage[1], filename + "/" + startPage[0], archiveFilesize, attachmentUUID, parentZipAttachmentUUID)
-                        if self.attachmentMetadataTargets:
-                            item.getXml().createNode(self.columnHeadings[n], attachmentUUID)
                         
 
         failCount = 0
@@ -1351,7 +1306,7 @@ class Engine():
                     self.echo("  Owner: " + ownerUsername)
                     try:
                         matchingUsers = self.tle.searchUsersByGroup("", ownerUsername)
-                    except:
+                    except Exception:
                         error = str(sys.exc_info()[1])
                         if error.rfind('HTTP') != -1 and  error.rfind('404') != -1:
                             self.echo("  ERROR: Cannot use Owner or Collaborators column datatypes with this version of EQUELLA", style=2)
@@ -1372,7 +1327,7 @@ class Engine():
                                     ownerID = userUUID
                                     foundExactMatch = True
                                     break
-                            except:
+                            except Exception:
                                 # If getUser fails, skip this user
                                 pass
                         
@@ -1403,7 +1358,7 @@ class Engine():
                     for specifiedCollaborator in specifiedCollaborators:
                         try:
                             matchingUsers = self.tle.searchUsersByGroup("", specifiedCollaborator.strip())
-                        except:
+                        except Exception:
                             error = str(sys.exc_info()[1])
                             if error.rfind('HTTP') != -1 and  error.rfind('404') != -1:
                                 self.echo("  ERROR: Cannot use Owner or Collaborators column datatypes with this version of EQUELLA", style=2)
@@ -1426,7 +1381,7 @@ class Engine():
                                         collaboratorIDs.append(collaboratorID)
                                         foundExactMatch = True
                                         break
-                                except:
+                                except Exception:
                                     # If getUser fails, skip this user
                                     pass
                             
@@ -1460,7 +1415,7 @@ class Engine():
                         itemVersion = int(meta[targetVersionColumn].strip())
                         if itemVersion < -1:
                             raise Exception("Invalid item version specified")
-                    except:
+                    except ValueError:
                         raise Exception("Invalid item version specified")
                 # if Source Identifier column specified check if item exists by sourceIdentifier
                 if sourceIdentifierColumn != -1:
@@ -1567,7 +1522,7 @@ class Engine():
                                                     "ebi":self.ebiScriptObject,
                                                     "equella":tle,                                                 
                                                     })
-                        except:
+                        except Exception:
                             if self.debug:
                                 raise
                             else:
@@ -1898,16 +1853,16 @@ class Engine():
                                                         # if imsmanifest indicates that package is a SCORM package then attach as a SCORM package
                                                         if self.scormformatsupport and imsmanifest.getNode("metadata/schema") == "ADL SCORM":
                                                             self.echo("    Package is a SCORM package")
-                                                            item.attachSCORM(self.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
+                                                            item.attachSCORM(Utils.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
                                                         else:
-                                                            item.attachIMS(self.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
+                                                            item.attachIMS(Utils.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
                                                         attemptingUpload = False
                                                         
                                                         attachmentType = self.attachmentTypeIMS
                                                         
                                                     if "SCORM" in commandOptions:
                                                         attemptingUpload = True
-                                                        item.attachSCORM(self.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
+                                                        item.attachSCORM(Utils.openFileForReading(filepath), filename, attachmentLinkName, uploadStatus, not testOnly, filesize, attachmentUUID, self.chunkSize)
                                                         attemptingUpload = False
                                                         
                                                         attachmentType = self.attachmentTypeSCORM
@@ -1917,7 +1872,7 @@ class Engine():
                                                     self.echo("    No IMS manifest found, treat as simple zip file")
         
                                                     # unzip file
-                                                    unzipAttachment()
+                                                    self._processUnzipAttachment(item, filename, filepath, filesize, attachmentLinkName, uploadStatus, n, zfobj, testOnly, self.columnHeadings[n] if self.attachmentMetadataTargets else None)
                                                     attachmentType = self.attachmentTypeZip
         
                                                 # check if command is IMS
@@ -1927,7 +1882,7 @@ class Engine():
                                             elif ("UNZIP" in commandOptions):
                                                 # unzip file
                                                 attemptingUpload = True
-                                                unzipAttachment()
+                                                self._processUnzipAttachment(item, filename, filepath, filesize, attachmentLinkName, uploadStatus, n, zfobj, testOnly, self.columnHeadings[n] if self.attachmentMetadataTargets else None)
                                                 attemptingUpload = False
                                                 attachmentType = self.attachmentTypeZip
         
@@ -1935,7 +1890,7 @@ class Engine():
                                         elif ("AUTO" in commandOptions):
                                             if not testOnly:
                                                 attemptingUpload = True
-                                                item.attachFile(filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
+                                                item.attachFile(filename, Utils.openFileForReading(filepath), uploadStatus, self.chunkSize)
                                                 attemptingUpload = False
                                             
                                             attachmentType = self.attachmentTypeFile
@@ -1947,7 +1902,7 @@ class Engine():
                                             # no command options
                                             if not testOnly:
                                                 attemptingUpload = True
-                                                item.attachFile(filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
+                                                item.attachFile(filename, Utils.openFileForReading(filepath), uploadStatus, self.chunkSize)
                                                 attemptingUpload = False
                                             
                                             attachmentType = self.attachmentTypeFile
@@ -1956,7 +1911,7 @@ class Engine():
                                         # No command options specified - treat as regular file attachment
                                         if not testOnly:
                                             attemptingUpload = True
-                                            item.attachFile(filename, self.openFileForReading(filepath), uploadStatus, self.chunkSize)
+                                            item.attachFile(filename, Utils.openFileForReading(filepath), uploadStatus, self.chunkSize)
                                             attemptingUpload = False
                                         
                                         attachmentType = self.attachmentTypeFile
@@ -2107,7 +2062,7 @@ class Engine():
                                     
                                         if not testOnly:
                                             attemptingUpload = True
-                                            item.attachFile(rawFile["filename"], self.openFileForReading(rawFile["filepath"]), uploadStatus, self.chunkSize)
+                                            item.attachFile(rawFile["filename"], Utils.openFileForReading(rawFile["filepath"]), uploadStatus, self.chunkSize)
                                             attemptingUpload = False
         
                                         
@@ -2457,7 +2412,7 @@ class Engine():
                                         if collaboratorID not in existingCollaboratorIDs:
                                             tle.addSharedOwner(savedItemID, savedItemVersion, collaboratorID)
 
-                                except:
+                                except Exception:
                                     exactError = str(sys.exc_info()[1])
                                     errorDebug = ""
                                     if self.debug:
@@ -2500,7 +2455,7 @@ class Engine():
                     sourceIdentifier = meta[sourceIdentifierColumn].strip()
                 return savedItemID, savedItemVersion, sourceIdentifier, meta, ""
                               
-            except:
+            except Exception:
                 exactError = str(sys.exc_info()[1])
 
                 # check if it is worthwhile recycling the session and retrying
@@ -2512,7 +2467,7 @@ class Engine():
                     time.sleep(5 * failCount)
                     try:
                         item.parClient._cancelEdit(item.getUUID(), item.getVersion())
-                    except:
+                    except Exception:
                         pass
                     self.tle = None
                     self.tle = TLEClient(self.institutionUrl, self.username, self.password, self.proxy, self.proxyUsername, self.proxyPassword, self.debug)                    
@@ -3027,7 +2982,7 @@ class Engine():
             if len(self.csvArray) > 1:
                 self.echo(time.strftime("%H:%M:%S: ", time.localtime(time.time())) + "DEBUG: First data row: %s" % str(self.csvArray[1]))
             with open(self.csvFilePath, "w", encoding=self.encoding, newline='') as f:
-                writer = UnicodeWriter(f, self.encoding)
+                writer = Utils.UnicodeWriter(f, self.encoding)
                 writer.writerows(self.csvArray)
                 f.flush()
                 os.fsync(f.fileno())
@@ -3577,20 +3532,7 @@ class Engine():
                                 
         return deconflictedFilepath
 
-class UnicodeWriter:
-    def __init__(self, f, encoding="utf-8", dialect=csv.excel, **kwds):
-        # Python 3 handles unicode natively, so we can write directly
-        self.writer = csv.writer(f, dialect=dialect, **kwds)
-        self.stream = f
-        self.encoding = encoding
-
-    def writerow(self, row):
-        # Python 3 csv module handles strings directly
-        self.writer.writerow(row)
-
-    def writerows(self, rows):
-        for row in rows:
-            self.writerow(row) 
+ 
 
 # script object used by EBI scripts
 class EbiScriptObject(object):
