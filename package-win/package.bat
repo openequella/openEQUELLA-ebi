@@ -12,7 +12,7 @@ python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python not found in PATH
     echo Please install Python 3 and ensure it's in your PATH
-    pause
+
     exit /b 1
 )
 
@@ -24,7 +24,7 @@ if errorlevel 1 (
     python -m pip install pyinstaller
     if errorlevel 1 (
         echo ERROR: Failed to install PyInstaller
-        pause
+    
         exit /b 1
     )
 )
@@ -42,14 +42,14 @@ echo Building executable with PyInstaller...
 python setup.py
 if errorlevel 1 (
     echo ERROR: Build failed
-    pause
+
     exit /b 1
 )
 
 REM Check if build succeeded
 if not exist dist\ebi.exe (
     echo ERROR: Build succeeded but ebi.exe not found
-    pause
+
     exit /b 1
 )
 
@@ -73,14 +73,14 @@ echo Creating distribution archive...
 python package.py
 if errorlevel 1 (
     echo ERROR: Packaging failed
-    pause
+
     exit /b 1
 )
 
 REM Verify zip was created
 if not exist ebi.zip (
     echo ERROR: ebi.zip was not created
-    pause
+
     exit /b 1
 )
 
@@ -89,4 +89,3 @@ echo ========================================
 echo Build complete: ebi.zip
 echo ========================================
 echo.
-pause
