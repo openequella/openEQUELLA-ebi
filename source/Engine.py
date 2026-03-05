@@ -807,7 +807,7 @@ class Engine:
         # if real form receipt filename and run check if receipts file is editable
         receiptFilename = ""
         if not self.export:
-            if itemIdColumn != -1 or rowErrorColumn != -1:
+            if itemIdColumn != -1:
                 # form receipts filename
                 if owner.txtCSVPath.GetValue() != "" and not os.path.isdir(
                     self.csvFilePath

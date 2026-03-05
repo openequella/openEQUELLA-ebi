@@ -357,7 +357,6 @@ class TLEClient:
                 % (args[0], args[1], args[2][0], args[2][1], len(args[2][2]), args[3])
             )
             self.owner.echo(" SOAP Input Parameters:\n" + printableArgs + "\n\n")
-        self.owner.echo(" Cookies:\n%s\n" % self._cookieJar)
 
     def _log_response(self, headers, response_body):
         if not self.owner.networkLogging:
@@ -365,7 +364,7 @@ class TLEClient:
 
         self.owner.echo("HTTP RESPONSE:\n")
         self.owner.echo(" Headers:\n%s\n" % headers)
-        self.owner.echo(" Cookies:\n%s\n" % self._cookieJar)
+
         self.owner.echo(" Response Body:\n%s\n" % response_body)
 
     def _handle_http_error(self, e):

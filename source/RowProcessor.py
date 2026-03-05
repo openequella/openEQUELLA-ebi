@@ -1298,6 +1298,41 @@ class RowProcessor:
 
         return owner_id, collaborator_ids, all_rows_error
 
+    def _get_default_state(self):
+        return {
+            "createNewItem": True,
+            "createNewVersion": False,
+            "allRowsError": False,
+            "itemID": "nil",
+            "itemVersion": 0,
+            "savedItemID": "",
+            "savedItemVersion": "",
+            "n": -1,
+            "attemptingUpload": False,
+            "imsmanifest": None,
+        }
+
+    def _clean_data(self, meta, ownerColumn, commandOptionsColumn, targetVersionColumn):
+        ownerUsername = meta[ownerColumn].strip()
+        commandOptions = []
+        if commandOptionsColumn != -1:
+            tempCommandOptions = [
+                commandOption.strip().upper()
+                for commandOption in meta[commandOptionsColumn].split(",")
+            ]
+            commandOptions = [cmd for cmd in tempCommandOptions if cmd != ""]
+
+        itemVersion = 0
+        if targetVersionColumn != -1 and meta[targetVersionColumn].strip() != "":
+            try:
+                itemVersion = int(meta[targetVersionColumn].strip())
+                if itemVersion < -1:
+                    raise Exception("Invalid item version specified")
+            except ValueError:
+                raise Exception("Invalid item version specified")
+
+        return ownerUsername, commandOptions, itemVersion
+
     def processRow(
         self,
         rowCounter,
@@ -1333,7 +1368,7 @@ class RowProcessor:
         This refactored process isolates business logic away from the GUI Engine.
         Large method parameter structures are bundled natively inside a `RowContext`
         pattern for readability and to prevent `__setattr__` and `__getattr__` side effects
-        from modifying iterations globally.
+        from iterations.
 
         Returns tuple: (itemID, itemVersion, error_message)
         """
@@ -1367,54 +1402,35 @@ class RowProcessor:
         # loop for retrying if network errors occur
         while not retriesDone:
             try:
-
                 wx.GetApp().Yield()
-                createNewItem = True
-                createNewVersion = False
-                allRowsError = False
-                itemID = "nil"
-                itemVersion = 0
-                savedItemID = ""
-                savedItemVersion = ""
-                n = -1
-                attemptingUpload = False
-                imsmanifest = None
+                state = self._get_default_state()
+                createNewItem = state["createNewItem"]
+                createNewVersion = state["createNewVersion"]
+                allRowsError = state["allRowsError"]
+                itemID = state["itemID"]
+                itemVersion = state["itemVersion"]
+                savedItemID = state["savedItemID"]
+                savedItemVersion = state["savedItemVersion"]
+                n = state["n"]
+                attemptingUpload = state["attemptingUpload"]
+                imsmanifest = state["imsmanifest"]
 
                 if self.Skip:
                     self.echo("  Row skipped")
                     return "", "", "", [], ""
-                # resolve owner/collaborators to IDs
-                ownerUsername = meta[ownerColumn].strip()
+
+                ownerUsername, commandOptions, extractedItemVersion = self._clean_data(
+                    meta, ownerColumn, commandOptionsColumn, targetVersionColumn
+                )
+                if extractedItemVersion != 0:
+                    itemVersion = extractedItemVersion
+
                 ownerID, collaboratorIDs, allRowsError = (
                     self._resolve_owner_and_collaborators(ctx, ownerUsername)
                 )
 
-                # get command options
-                commandOptions = []
-                if commandOptionsColumn != -1:
-
-                    # get position of command options column
-                    tempCommandOptions = [
-                        commandOption.strip().upper()
-                        for commandOption in meta[commandOptionsColumn].split(",")
-                    ]
-                    for commandOption in tempCommandOptions:
-                        if commandOption != "":
-                            commandOptions.append(commandOption)
-                    if len(commandOptions) > 0:
-                        self.echo("  Command options: " + ",".join(commandOptions))
-
-                # get targeted item version if target version specified
-                if (
-                    targetVersionColumn != -1
-                    and meta[targetVersionColumn].strip() != ""
-                ):
-                    try:
-                        itemVersion = int(meta[targetVersionColumn].strip())
-                        if itemVersion < -1:
-                            raise Exception("Invalid item version specified")
-                    except ValueError:
-                        raise Exception("Invalid item version specified")
+                if len(commandOptions) > 0:
+                    self.echo("  Command options: " + ",".join(commandOptions))
                 # if Source Identifier column specified check if item exists by sourceIdentifier
                 if sourceIdentifierColumn != -1:
                     itemID, itemVersion, createNewItem = self._find_existing_item(
