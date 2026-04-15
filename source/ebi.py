@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #Boa:App:ebi
 
 # EQUELLA BULK IMPORTER (EBI)
@@ -17,6 +17,7 @@
 # A detailed and comprehensive user guide is distributed with this program. Please see this for more
 # detailed usage instructions and troubleshooting tips.
 
+# system settings (do not change!)
 # system settings (do not change!)
 Version = "4.73"
 Copyright = """
@@ -103,7 +104,7 @@ License = """
       on behalf of whom a Contribution has been received by Licensor and
       subsequently incorporated within the Work.
 
-   2. Grant of Copyright License. Subject to the terms and conditions of
+      "Grant of Copyright License. Subject to the terms and conditions of
       this License, each Contributor hereby grants to You a perpetual,
       worldwide, non-exclusive, no-charge, royalty-free, irrevocable
       copyright license to reproduce, prepare Derivative Works of,
@@ -247,16 +248,25 @@ SuppressVersion = False
 import sys, os, traceback
 import wx
 import MainFrame
-import ConfigParser
+import configparser
 import platform
 
-modules ={'MainFrame': [1, u'Main frame of EBI', 'none://MainFrame.py']}
+modules ={'MainFrame': [1, 'Main frame of EBI', 'none://MainFrame.py']}
 
 propertiesFile = "ebi.properties"
-if sys.path[0].endswith(".zip"):
-    propertiesFile = os.path.join(os.path.dirname(sys.path[0]), propertiesFile)
+
+# Handle PyInstaller bundle - use sys._MEIPASS for bundled data files
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle
+    basePath = sys._MEIPASS
 else:
-    propertiesFile = os.path.join(sys.path[0], propertiesFile)
+    # Running as script
+    if sys.path[0].endswith(".zip"):
+        basePath = os.path.dirname(sys.path[0])
+    else:
+        basePath = sys.path[0]
+
+propertiesFile = os.path.join(basePath, propertiesFile)
             
 display = True
 
@@ -264,21 +274,25 @@ class ebi(wx.App):
     global display
 
     def OnInit(self):
+        wx.SystemOptions.SetOption("osx.openfiledialog.always-show-types", "1")
         self.main = MainFrame.create(None)
         if display:
-            self.main.Show()
-            self.SetTopWindow(self.main)
+            wx.CallAfter(self._show_main)
         return True
+    
+    def _show_main(self):
+        self.main.Show()
+        self.SetTopWindow(self.main)
 
 def alert(message):
     message = message + "\n\n" + Copyright
-    app = wx.PySimpleApp()
+    app = wx.App(False)
     dialog = wx.Dialog(None, title='EQUELLA Bulk Importer ' + Version, size=wx.Size(500, 300), style=wx.RESIZE_BORDER|wx.DEFAULT_DIALOG_STYLE)
     dialog.Center()
     box = wx.BoxSizer(wx.VERTICAL)
     dialog.SetSizer(box)
-    txtMessage = wx.TextCtrl(dialog, -1, message, style=wx.TE_MULTILINE|wx.TE_READONLY)    
-    box.Add(txtMessage, 1, wx.ALIGN_CENTER|wx.ALL|wx.EXPAND)
+    txtMessage = wx.TextCtrl(dialog, -1, message, style=wx.TE_MULTILINE|wx.TE_READONLY)
+    box.Add(txtMessage, 1, wx.ALL|wx.EXPAND, 5)
     
     btnsizer = wx.StdDialogButtonSizer()
     btn = wx.Button(dialog, wx.ID_OK)
@@ -302,7 +316,7 @@ def main():
         global propertiesFile
         
         # create properties file
-        config = ConfigParser.ConfigParser()
+        config = configparser.ConfigParser()
         config.read(propertiesFile)
         if not "Configuration" in config.sections():
             config.add_section('Configuration')
@@ -368,7 +382,7 @@ Run the EBI non-visually in test mode using the specified settings file, no item
 
             if "-test" in sys.argv and usageCorrect :
                 # run non-visually in test mode
-                # print "Testing " + settingsFile
+                # print("Testing " + settingsFile)
                 try:
                     display = False
                     application = ebi(0)
@@ -383,13 +397,13 @@ Run the EBI non-visually in test mode using the specified settings file, no item
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
                     errorString = "ERROR: " + str(exceptionValue)
                     if Debug:
-                        errorString += ': ' + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                        errorString += ': ' + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
                     alert(errorString)
                 
             elif "-start" in sys.argv and usageCorrect :
                 try:
                     # run non-visually
-                    # print "Running " + settingsFile
+                    # print("Running " + settingsFile)
                     display = False
                     application = ebi(0)
                     if SuppressVersion:
@@ -403,7 +417,7 @@ Run the EBI non-visually in test mode using the specified settings file, no item
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
                     errorString = "ERROR: " + str(exceptionValue)
                     if Debug:
-                        errorString += ': ' + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                        errorString += ': ' + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
                     alert(errorString)            
                 
             elif usageCorrect:
@@ -428,7 +442,7 @@ Run the EBI non-visually in test mode using the specified settings file, no item
                     exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
                     errorString = "ERROR: " + str(exceptionValue)
                     if Debug:
-                        errorString += ': ' + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
+                        errorString += ': ' + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))
                     alert(errorString)
             else:
                 alert(usageSyntax)
@@ -440,7 +454,7 @@ Run the EBI non-visually in test mode using the specified settings file, no item
             if platform.system() == "Darwin":
                 errorString += "\n\nIf launching EBI from a mounted disk image (*.dmg) first copy the EBI package to Applications or another local directory."
         if Debug:
-            errorString += "\n\n" + ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))                
+            errorString += "\n\n" + ''.join(str(line) for line in traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback))                
         alert(errorString)
 
 

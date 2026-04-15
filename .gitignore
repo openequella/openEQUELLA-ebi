@@ -1,1 +1,10 @@
 *.pyc
+logs
+*/logs
+*/logs/**
+*/.eggs
+*/build
+*/dist
+*/ebi
+*/__pycache__
+.venv
