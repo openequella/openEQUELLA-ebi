@@ -101,7 +101,13 @@ For developers looking to contribute, extend, or maintain the codebase, here's h
    - `source/equellaclient41.py`: The core SOAP API client to communicate with an EQUELLA instance.
 
 ## Compiling/Packaging Standalone
-EBI should be compiled as a standalone package to remove the need for end users to install Python. Compiling a Windows version must be done from a Windows computer, a Linux version from a Linux computer, and a Macintosh version must be done from a Macintosh computer.
+EBI can be compiled as a standalone package to remove the need for end users to install Python. 
+
+### Automated Builds (GitHub Actions)
+The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for every push to `master`, `develop`, or `release/**` branches. When a new tag is pushed, these binaries are bundled into a GitHub Release as downloadable assets, completely automating the packaging process.
+
+### Manual Compilation
+For local testing or manual builds, compiling a Windows version must be done from a Windows computer, a Linux version from a Linux computer, and a Macintosh version must be done from a Macintosh computer.
 
 ### Compiling a Windows Standalone Package
 Use a Windows computer with Python 3.8+, wxPython, and PyInstaller installed.
