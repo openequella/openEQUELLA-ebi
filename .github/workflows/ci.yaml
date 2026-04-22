@@ -6,6 +6,8 @@ on:
       - master
       - develop
       - release/**
+    tags:
+      - '*'
     paths:
       - '**.py'
       - '**.spec'
@@ -111,3 +113,39 @@ jobs:
         with:
           name: ebi-windows
           path: ebi-windows.zip
+
+  publish-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs:
+      - build-linux
+      - build-mac
+      - build-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ebi-linux
+          path: release-assets/ebi-linux
+
+      - name: Download Mac Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ebi-mac
+          path: release-assets/ebi-mac
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ebi-windows
+          path: release-assets/ebi-windows
+
+      - name: Publish GitHub Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/ebi-linux/*
+            release-assets/ebi-mac/*
+            release-assets/ebi-windows/*

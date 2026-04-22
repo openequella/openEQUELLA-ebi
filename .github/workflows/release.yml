@@ -1,8 +1,6 @@
 name: Release EBI Packages
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:  # Added to allow manual triggering from the Actions tab
 
 jobs:
@@ -85,7 +83,7 @@ jobs:
         shell: bash
 
       - name: Upload artifacts to GitHub Release
-        if: github.event_name == 'release'
+        if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.UPLOAD_PATH }}
