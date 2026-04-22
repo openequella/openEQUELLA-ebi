@@ -1,4 +1,4 @@
-name: openEQUELLA Admin Console Launcher CI
+name: openEQUELLA Bulk Importer CI
 
 on:
   push:
@@ -6,8 +6,6 @@ on:
       - master
       - develop
       - release/**
-    tags:
-      - "**"
   pull_request:
     branches:
       - master
@@ -23,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.10'
           
       - name: Install System Dependencies
         run: |
@@ -32,18 +30,18 @@ jobs:
           
       - name: Install Python Dependencies
         run: |
-          pip install -r requirements.txt
           pip install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-20.04 wxPython>=4.2.0
+          pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build Linux Package
         working-directory: package-linux
         run: bash package.sh
         
-      - name: Rename Artefact
+      - name: Rename Artifact
         run: mv package-linux/ebi.zip ebi-linux.zip
         
-      - name: Save Linux Artefact
+      - name: Save Linux Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ebi-linux
@@ -57,7 +55,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.10'
           
       - name: Install Dependencies
         run: |
@@ -69,7 +67,7 @@ jobs:
         working-directory: package-mac
         run: bash ebi-package.command
         
-      - name: Save Mac Artefact
+      - name: Save Mac Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ebi-mac
@@ -83,7 +81,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.10'
           
       - name: Install Dependencies
         run: |
@@ -95,38 +93,11 @@ jobs:
         working-directory: package-win
         run: cmd /c package.bat
         
-      - name: Rename Artefact
-        run: rename package-win\ebi.zip ebi-windows.zip
+      - name: Rename Artifact
+        run: Move-Item package-win\ebi.zip ebi-windows.zip
         
-      - name: Save Windows Artefact
+      - name: Save Windows Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ebi-windows
           path: ebi-windows.zip
-
-  release:
-    needs: [build-linux, build-mac, build-windows]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-      - name: Download Linux Artefact
-        uses: actions/download-artifact@v4
-        with:
-          name: ebi-linux
-          path: out
-      - name: Download Mac Artefact
-        uses: actions/download-artifact@v4
-        with:
-          name: ebi-mac
-          path: out
-      - name: Download Windows Artefact
-        uses: actions/download-artifact@v4
-        with:
-          name: ebi-windows
-          path: out
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: out/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

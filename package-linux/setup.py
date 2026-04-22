@@ -54,7 +54,7 @@ def main():
     print(f"Running: {' '.join(cmd)}")
     print()
 
-    result = subprocess.run(cmd, cwd=os.path.abspath(os.path.dirname(__file__)))
+    result = subprocess.run(cmd, cwd=os.path.dirname(os.path.abspath(__file__)))
 
     if result.returncode == 0:
         print()

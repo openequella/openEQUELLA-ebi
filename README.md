@@ -1,14 +1,14 @@
 # EBI (openEQUELLA Bulk Importer)
 The EBI is a popular tool for importing content into openEQUELLA. It can also be used for updating, deleting and exporting content.
 
-The EBI is written in Python and compiled to a standalone version (i.e. will run on a computer without Python) for Windows and Macintosh. The source files are included in the Windows package so that the EBI can be used on Linux computers with Python (and wxPython, see Dependencies) installed.
+The EBI is written in Python and compiled to a standalone version (i.e. will run on a computer without Python) for Windows, Macintosh, and Linux. The source files are also included in the packages so that the EBI can be run from source on systems with Python (and wxPython, see Dependencies) installed.
 
 User guide can be found at: https://openequella.github.io/equella-tools/bulkImporterUserManual.html
 
 ## Dependencies
 The EBI requires both Python 3.x and the GUI framework wxPython 4.x.
-The latest release of MS Windows version does not require Python nor wxPython to be installed.
-To run the EBI on Linux and Mac, or running from source files (as required on Linux) both Python 3.x and wxPython 4.x must be installed.
+The latest releases of the standalone packages for Windows, macOS, and Linux do not require Python nor wxPython to be installed.
+To run the EBI from source files, both Python 3.x and wxPython 4.x must be installed.
 On Linux, wxPython requires GTK+ 3 libraries to be present.
 
 To make modifications to and test EBI, Python 3.x and wxPython 4.x must be installed on the developer’s workstation. To compile the EBI as a standalone package then, as well as Python 3.x and wxPython 4.x, PyInstaller is required on the workstation.
@@ -64,8 +64,8 @@ pip3 install -r requirements.txt
 pip3 install PyInstaller
 ```
 
-The latest release of MS Windows version does not require installing Python or wxPython.
-To run the EBI on Linux and Mac, or running from source files (as required on Linux), both Python 3.8+ and wxPython must be installed.
+The latest releases of the standalone packages for Windows, macOS, and Linux do not require installing Python or wxPython.
+To run the EBI from source files, both Python 3.10+ and wxPython must be installed.
 
 To make modifications to and test EBI, Python 3.8+ and wxPython must be installed on the developer's workstation. To compile the EBI as a standalone package, PyInstaller must be installed on the workstation.
 
