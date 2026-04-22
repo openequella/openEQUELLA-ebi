@@ -1,7 +1,7 @@
 # EBI (openEQUELLA Bulk Importer)
 The EBI is a popular tool for importing content into openEQUELLA. It can also be used for updating, deleting and exporting content.
 
-The EBI is written in Python and compiled to a standalone version (i.e. will run on a computer without Python) for Windows, Macintosh, and Linux. The source files are also included in the packages so that the EBI can be run from source on systems with Python (and wxPython, see Dependencies) installed.
+The EBI is written in Python and compiled to standalone versions (i.e. they will run on a computer without Python) for Windows, macOS, and Linux. The EBI can also be run from the source files on systems with Python (and wxPython, see Dependencies) installed.
 
 User guide can be found at: https://openequella.github.io/equella-tools/bulkImporterUserManual.html
 
