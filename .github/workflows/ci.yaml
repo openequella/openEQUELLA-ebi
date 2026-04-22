@@ -146,6 +146,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-assets/ebi-linux/*
-            release-assets/ebi-mac/*
-            release-assets/ebi-windows/*
+            release-assets/ebi-linux/ebi-linux.zip
+            release-assets/ebi-mac/ebi.dmg
+            release-assets/ebi-windows/ebi-windows.zip
