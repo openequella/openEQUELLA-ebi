@@ -104,7 +104,7 @@ For developers looking to contribute, extend, or maintain the codebase, here's h
 EBI can be compiled as a standalone package to remove the need for end users to install Python. 
 
 ### Automated Builds (GitHub Actions)
-The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for every push to `master`, `develop`, or `release/**` branches. When a new tag is pushed, these binaries are bundled into a GitHub Release as downloadable assets, completely automating the packaging process.
+The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for every push to `master`, `develop`, or `release/**` branches. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs.
 
 ### Manual Compilation
 For local testing or manual builds, compiling a Windows version must be done from a Windows computer, a Linux version from a Linux computer, and a Macintosh version must be done from a Macintosh computer.
