@@ -65,7 +65,7 @@ pip3 install PyInstaller
 ```
 
 The latest releases of the standalone packages for Windows, macOS, and Linux do not require installing Python or wxPython.
-To run the EBI from source files, both Python 3.10+ and wxPython must be installed.
+To run the EBI from source files, both Python 3.8+ and wxPython must be installed.
 
 To make modifications to and test EBI, Python 3.8+ and wxPython must be installed on the developer's workstation. To compile the EBI as a standalone package, PyInstaller must be installed on the workstation.
 
