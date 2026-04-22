@@ -6,11 +6,23 @@ on:
       - master
       - develop
       - release/**
+    paths:
+      - '**.py'
+      - '**.spec'
+      - 'package-*/**'
+      - '.github/workflows/ci.yaml'
+      - 'requirements.txt'
   pull_request:
     branches:
       - master
       - develop
       - release/**
+    paths:
+      - '**.py'
+      - '**.spec'
+      - 'package-*/**'
+      - '.github/workflows/ci.yaml'
+      - 'requirements.txt'
 
 jobs:
   build-linux:
