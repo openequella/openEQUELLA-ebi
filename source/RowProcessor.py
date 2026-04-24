@@ -626,7 +626,7 @@ class RowProcessor:
             if values[i].strip() != "":
 
                 # get absolute path to file
-                filepath = os.path.join(self.absoluteAttachmentsBasepath, values[i])
+                filepath = os.path.normpath(os.path.join(self.absoluteAttachmentsBasepath, values[i]))
 
                 # Validate file path exists
                 if not os.path.exists(filepath):
@@ -722,16 +722,16 @@ class RowProcessor:
                     self.echo("  Folder: " + values[i] + targetDisplay)
 
                     # recurse through the folder adding files to be uploaded
-                    rootdir = os.path.join(
+                    rootdir = os.path.normpath(os.path.join(
                         self.absoluteAttachmentsBasepath, values[i]
-                    ).strip()[:-2]
+                    ).strip()[:-2])
                     for dirname, dirnames, filenames in os.walk(rootdir):
                         for filename in filenames:
                             rawFile = {}
                             rawFile["filepath"] = os.path.join(dirname, filename)
                             rawFile["originalfilename"] = os.path.relpath(
                                 rawFile["filepath"], rootdir
-                            )
+                            ).replace("\\", "/")
                             rawFile["filename"] = (
                                 prependFolder + rawFile["originalfilename"]
                             )
@@ -740,9 +740,9 @@ class RowProcessor:
                 else:
                     # a single file was specified so add that as the only file to be uploaded
                     rawFile = {}
-                    rawFile["filepath"] = os.path.join(
+                    rawFile["filepath"] = os.path.normpath(os.path.join(
                         self.absoluteAttachmentsBasepath, values[i]
-                    )
+                    ))
                     # ensure that attachment specified is not a directory
                     if os.path.isdir(rawFile["filepath"]):
                         raise Exception(rawFile["filepath"] + " is not a file")
