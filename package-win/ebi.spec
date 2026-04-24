@@ -79,17 +79,14 @@ pyz = PYZ(
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='ebi',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
     upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,  # GUI application, no console window
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -100,7 +97,16 @@ exe = EXE(
     version_file=None,  # Can add version info file here if created
 )
 
-# Optional: Create version info
-# To create a version info file, use:
-# pyi-grab_version <some_exe.exe>
-# Then edit and reference it above
+# One-dir mode: place the exe and all DLLs in a folder instead of embedding
+# them in a single executable. This avoids Windows security restrictions that
+# prevent one-file exes from reading themselves when run from a network drive.
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='ebi',
+)
