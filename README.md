@@ -106,6 +106,12 @@ EBI can be compiled as a standalone package to remove the need for end users to 
 ### Automated Builds (GitHub Actions)
 The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for every push to `master`, `develop`, or `release/**` branches. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
 
+> **Note for macOS Users**: When downloading the `ebi.dmg` artifact from GitHub Actions or GitHub Releases, macOS Gatekeeper may flag the application as "damaged" because it was downloaded from the internet and lacks an Apple Developer certificate. To run the application, you must remove the quarantine attribute. Open your Terminal and run:
+> ```bash
+> xattr -cr /path/to/ebi.app
+> ```
+> Alternatively, you can right-click the application bundle and select "Open" to bypass the initial security prompt.
+
 ### Manual Compilation
 For local testing or manual builds, compiling a Windows version must be done from a Windows computer, a Linux version from a Linux computer, and a Macintosh version must be done from a Macintosh computer.
 
