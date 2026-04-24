@@ -14,6 +14,7 @@ Or use the setup.py wrapper:
 
 import os
 import sys
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 # Get the directory containing this spec file
 spec_dir = os.path.dirname(os.path.abspath(SPEC))
@@ -21,9 +22,11 @@ spec_dir = os.path.dirname(os.path.abspath(SPEC))
 # Path to source files - use the main source directory, not package-win-linux
 source_dir = os.path.join(os.path.dirname(spec_dir), 'source')
 
-# Import version from ebi module
-sys.path.insert(0, source_dir)
-import ebi
+# (Importing ebi here is avoided to prevent DLL load issues during PyInstaller analysis)
+
+# Explicitly collect all wx native DLLs so PyInstaller bundles them correctly on all
+# architectures (including Windows ARM64) where auto-detection misses wx runtime DLLs.
+wx_binaries = collect_dynamic_libs('wx')
 
 block_cipher = None
 
@@ -54,7 +57,7 @@ hiddenimports = [
 a = Analysis(
     [os.path.join(source_dir, 'ebi.py')],
     pathex=[source_dir],
-    binaries=[],
+    binaries=wx_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -84,7 +87,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,  # GUI application, no console window

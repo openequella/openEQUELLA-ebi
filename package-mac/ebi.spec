@@ -14,6 +14,8 @@ Or use the setup.py wrapper:
 
 import os
 import sys
+import re
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 # Get the directory containing this spec file
 spec_dir = os.path.dirname(os.path.abspath(SPEC))
@@ -21,11 +23,22 @@ spec_dir = os.path.dirname(os.path.abspath(SPEC))
 # Path to source files - use the main source directory, not the outdated copy
 source_dir = os.path.join(os.path.dirname(spec_dir), 'source')
 
-# Import version from ebi module
-sys.path.insert(0, source_dir)
-import ebi
+# Read version from ebi.py without importing it to prevent DLL load issues
+import re
+ebi_version = "4.73" # Fallback
+try:
+    with open(os.path.join(source_dir, 'ebi.py'), 'r', encoding='utf-8') as f:
+        match = re.search(r'^Version\s*=\s*[\'"]([^\'"]+)[\'"]', f.read(), re.MULTILINE)
+        if match:
+            ebi_version = match.group(1)
+except Exception:
+    pass
 
 block_cipher = None
+
+# Explicitly collect all wx native shared libs so PyInstaller bundles them correctly
+# on all architectures (including macOS Apple Silicon) where auto-detection may miss them.
+wx_binaries = collect_dynamic_libs('wx')
 
 # Collect all data files (images, icons, properties)
 datas = [
@@ -54,7 +67,7 @@ hiddenimports = [
 a = Analysis(
     [os.path.join(source_dir, 'ebi.py')],
     pathex=[source_dir],
-    binaries=[],
+    binaries=wx_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -82,7 +95,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,  # GUI application, no console window
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -97,7 +110,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='ebi',
 )
@@ -107,12 +120,12 @@ app = BUNDLE(
     name='ebi.app',
     icon=None,  # macOS requires .icns format; .ico files from Windows won't work without conversion
     bundle_identifier='org.apereo.equella.ebi',
-    version=ebi.Version,
+    version=ebi_version,
     info_plist={
         'CFBundleName': 'EQUELLA Bulk Importer',
         'CFBundleDisplayName': 'EQUELLA Bulk Importer',
-        'CFBundleShortVersionString': ebi.Version,
-        'CFBundleVersion': ebi.Version,
+        'CFBundleShortVersionString': ebi_version,
+        'CFBundleVersion': ebi_version,
         'CFBundleIdentifier': 'org.apereo.equella.ebi',
         'NSHumanReadableCopyright': 'Copyright (c) 2024, The Apereo Foundation',
         'NSHighResolutionCapable': True,
