@@ -39,14 +39,15 @@ if [ $? -ne 0 ]; then
 fi
 
 # Check if build succeeded
-if [ ! -f "dist/ebi" ]; then
-    echo "ERROR: Build succeeded but ebi executable not found"
+if [ ! -f "dist/ebi/ebi" ]; then
+    echo "ERROR: Build succeeded but dist/ebi/ebi executable not found"
     exit 1
 fi
 
-# Rename dist to ebi for distribution
+# Move built directory to ebi for distribution
 echo "Preparing distribution directory..."
-mv dist ebi
+mv dist/ebi ebi
+rmdir dist 2>/dev/null || true
 
 # PyInstaller includes everything needed, but copy source files for reference
 echo "Copying source files for reference..."

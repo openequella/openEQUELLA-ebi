@@ -1,14 +1,14 @@
 # EBI (openEQUELLA Bulk Importer)
 The EBI is a popular tool for importing content into openEQUELLA. It can also be used for updating, deleting and exporting content.
 
-The EBI is written in Python and compiled to a standalone version (i.e. will run on a computer without Python) for Windows and Macintosh. The source files are included in the Windows package so that the EBI can be used on Linux computers with Python (and wxPython, see Dependencies) installed.
+The EBI is written in Python and compiled to standalone versions (i.e. they will run on a computer without Python) for Windows, macOS, and Linux. The EBI can also be run from the source files on systems with Python (and wxPython, see Dependencies) installed.
 
 User guide can be found at: https://openequella.github.io/equella-tools/bulkImporterUserManual.html
 
 ## Dependencies
 The EBI requires both Python 3.x and the GUI framework wxPython 4.x.
-The latest release of MS Windows version does not require Python nor wxPython to be installed.
-To run the EBI on Linux and Mac, or running from source files (as required on Linux) both Python 3.x and wxPython 4.x must be installed.
+The latest releases of the standalone packages for Windows, macOS, and Linux do not require Python nor wxPython to be installed.
+To run the EBI from source files, both Python 3.x and wxPython 4.x must be installed.
 On Linux, wxPython requires GTK+ 3 libraries to be present.
 
 To make modifications to and test EBI, Python 3.x and wxPython 4.x must be installed on the developer’s workstation. To compile the EBI as a standalone package then, as well as Python 3.x and wxPython 4.x, PyInstaller is required on the workstation.
@@ -64,8 +64,8 @@ pip3 install -r requirements.txt
 pip3 install PyInstaller
 ```
 
-The latest release of MS Windows version does not require installing Python or wxPython.
-To run the EBI on Linux and Mac, or running from source files (as required on Linux), both Python 3.8+ and wxPython must be installed.
+The latest releases of the standalone packages for Windows, macOS, and Linux do not require installing Python or wxPython.
+To run the EBI from source files, both Python 3.8+ and wxPython must be installed.
 
 To make modifications to and test EBI, Python 3.8+ and wxPython must be installed on the developer's workstation. To compile the EBI as a standalone package, PyInstaller must be installed on the workstation.
 
@@ -101,7 +101,19 @@ For developers looking to contribute, extend, or maintain the codebase, here's h
    - `source/equellaclient41.py`: The core SOAP API client to communicate with an EQUELLA instance.
 
 ## Compiling/Packaging Standalone
-EBI should be compiled as a standalone package to remove the need for end users to install Python. Compiling a Windows version must be done from a Windows computer, a Linux version from a Linux computer, and a Macintosh version must be done from a Macintosh computer.
+EBI can be compiled as a standalone package to remove the need for end users to install Python. 
+
+### Automated Builds (GitHub Actions)
+The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for every push to `master`, `develop`, or `release/**` branches. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
+
+> **Note for macOS Users**: When downloading the `ebi.dmg` artifact from GitHub Actions or GitHub Releases, macOS Gatekeeper may flag the application as "damaged" because it was downloaded from the internet and lacks an Apple Developer certificate. To run the application, you must remove the quarantine attribute. Open your Terminal and run:
+> ```bash
+> xattr -cr /path/to/ebi.app
+> ```
+> Alternatively, you can right-click the application bundle and select "Open" to bypass the initial security prompt.
+
+### Manual Compilation
+For local testing or manual builds, compiling a Windows version must be done from a Windows computer, a Linux version from a Linux computer, and a Macintosh version must be done from a Macintosh computer.
 
 ### Compiling a Windows Standalone Package
 Use a Windows computer with Python 3.8+, wxPython, and PyInstaller installed.

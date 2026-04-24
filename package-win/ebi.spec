@@ -14,6 +14,7 @@ Or use the setup.py wrapper:
 
 import os
 import sys
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 # Get the directory containing this spec file
 spec_dir = os.path.dirname(os.path.abspath(SPEC))
@@ -21,9 +22,11 @@ spec_dir = os.path.dirname(os.path.abspath(SPEC))
 # Path to source files - use the main source directory, not package-win-linux
 source_dir = os.path.join(os.path.dirname(spec_dir), 'source')
 
-# Import version from ebi module
-sys.path.insert(0, source_dir)
-import ebi
+# (Importing ebi here is avoided to prevent DLL load issues during PyInstaller analysis)
+
+# Explicitly collect all wx native DLLs so PyInstaller bundles them correctly on all
+# architectures (including Windows ARM64) where auto-detection misses wx runtime DLLs.
+wx_binaries = collect_dynamic_libs('wx')
 
 block_cipher = None
 
@@ -54,7 +57,7 @@ hiddenimports = [
 a = Analysis(
     [os.path.join(source_dir, 'ebi.py')],
     pathex=[source_dir],
-    binaries=[],
+    binaries=wx_binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
@@ -76,17 +79,14 @@ pyz = PYZ(
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='ebi',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,  # GUI application, no console window
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -97,7 +97,16 @@ exe = EXE(
     version_file=None,  # Can add version info file here if created
 )
 
-# Optional: Create version info
-# To create a version info file, use:
-# pyi-grab_version <some_exe.exe>
-# Then edit and reference it above
+# One-dir mode: place the exe and all DLLs in a folder instead of embedding
+# them in a single executable. This avoids Windows security restrictions that
+# prevent one-file exes from reading themselves when run from a network drive.
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='ebi',
+)

@@ -2783,7 +2783,7 @@ class Engine:
                                 if attachment.getNode("@type") == "local":
                                     if filename.find("/") == -1:
                                         # download simple file
-                                        filepath = os.path.join(filesfolder, filename)
+                                        filepath = os.path.normpath(os.path.join(filesfolder, filename))
                                         fileUrl = itemUrl + urllib.parse.quote(filename)
 
                                         if (
@@ -2814,7 +2814,7 @@ class Engine:
                                         # set cell value
                                         if not filename in cellValues:
                                             cellValues.append(
-                                                os.path.relpath(filepath, filesfolder)
+                                                os.path.relpath(filepath, filesfolder).replace("\\", "/")
                                             )
                                     else:
                                         # possibly a zip file
@@ -2825,9 +2825,9 @@ class Engine:
                                             relfilename = filename[
                                                 filename.find("/") + 1 :
                                             ]
-                                            filepath = os.path.join(
+                                            filepath = os.path.normpath(os.path.join(
                                                 filesfolder, zipfilename
-                                            )
+                                            ))
                                             fileUrl = (
                                                 itemUrl
                                                 + "_zips/"
@@ -2872,7 +2872,7 @@ class Engine:
                                                 cellValues.append(
                                                     os.path.relpath(
                                                         filepath, filesfolder
-                                                    )
+                                                    ).replace("\\", "/")
                                                 )
                                                 zipFiles.append(zipfilename)
 
@@ -2881,7 +2881,7 @@ class Engine:
                                     and attachment.getNode("type") == "scorm"
                                 ):
                                     # download SCORM package
-                                    filepath = os.path.join(filesfolder, filename)
+                                    filepath = os.path.normpath(os.path.join(filesfolder, filename))
 
                                     # "deconflict" files of same name
                                     filepath = self.deconflict(
@@ -2933,7 +2933,7 @@ class Engine:
                             filename = itemXml.getNode("item/itembody/packagefile")
 
                             # download IMS package
-                            filepath = os.path.join(filesfolder, filename)
+                            filepath = os.path.normpath(os.path.join(filesfolder, filename))
 
                             # "deconflict" files of same name
                             filepath = self.deconflict(

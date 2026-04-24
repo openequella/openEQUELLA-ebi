@@ -47,15 +47,16 @@ if errorlevel 1 (
 )
 
 REM Check if build succeeded
-if not exist dist\ebi.exe (
-    echo ERROR: Build succeeded but ebi.exe not found
+if not exist dist\ebi\ebi.exe (
+    echo ERROR: Build succeeded but dist\ebi\ebi.exe not found
 
     exit /b 1
 )
 
-REM Rename dist to ebi for distribution
+REM Move built directory to ebi for distribution
 echo Preparing distribution directory...
-rename dist ebi
+move dist\ebi ebi
+rmdir dist 2>nul
 
 REM PyInstaller includes everything needed, but copy source files for reference
 echo Copying source files for reference...
