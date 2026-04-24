@@ -46,6 +46,10 @@ echo "Copying launcher script..."
 cp ebi.command dist/ebi.app/Contents/MacOS/ebi.command || true
 chmod +x dist/ebi.app/Contents/MacOS/ebi.command || true
 
+# Re-sign the app bundle after modifications to prevent Gatekeeper rejection
+echo "Re-signing application bundle..."
+codesign --force --deep --sign - dist/ebi.app
+
 # Create DMG
 echo "Creating DMG..."
 cd dist
