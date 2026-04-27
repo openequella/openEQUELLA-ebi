@@ -4,7 +4,7 @@ This directory contains scripts for building EBI executable for Windows (and pot
 
 ## Prerequisites
 
-- Python 3.7 or later (including 3.10, 3.11, 3.12, 3.13+)
+- Python 3.7 or later (including 3.10, 3.11, 3.12, 3.13, 3.14+)
 - PyInstaller: `pip install pyinstaller`
 - wxPython: `pip install wxPython`
 
