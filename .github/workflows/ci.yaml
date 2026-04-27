@@ -58,7 +58,7 @@ jobs:
         run: mv package-linux/ebi.zip ebi-linux.zip
         
       - name: Save Linux Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ebi-linux
           path: ebi-linux.zip
@@ -84,7 +84,7 @@ jobs:
         run: bash ebi-package.command
         
       - name: Save Mac Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ebi-mac
           path: package-mac/dist/ebi.dmg
@@ -113,7 +113,7 @@ jobs:
         run: Move-Item package-win\ebi.zip ebi-windows.zip
         
       - name: Save Windows Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ebi-windows
           path: ebi-windows.zip
@@ -129,19 +129,19 @@ jobs:
       contents: write
     steps:
       - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ebi-linux
           path: release-assets/ebi-linux
 
       - name: Download Mac Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ebi-mac
           path: release-assets/ebi-mac
 
       - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ebi-windows
           path: release-assets/ebi-windows
