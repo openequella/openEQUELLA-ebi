@@ -66,7 +66,7 @@ python3 source/ebi.py
    ```
 3. **Make your changes** and verify they work by running EBI from source (see [Running the App Locally](#running-the-app-locally)).
 4. **Commit** with a clear, descriptive message.
-5. **Push** your branch to your fork and open a **Pull Request** against the repository's current default branch, which reflects the latest development state.
+5. **Push** your branch to your fork and open a **Pull Request** against `master`, which reflects the latest development state.
 6. Respond to any review feedback.
 
 ## Code Conventions
