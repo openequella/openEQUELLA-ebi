@@ -93,7 +93,7 @@ You do not need to build packages locally to contribute code changes.
 
 ### Automated Builds (GitHub Actions)
 
-The CI workflow automatically compiles all three standalone versions (Windows, macOS, Linux) for supported pull requests and pushes to the active development branch. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
+The CI workflow automatically compiles all three standalone versions (Windows, macOS, Linux) for supported pull requests and pushes to `master`. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
 
 ### Manual Compilation
 
