@@ -12,6 +12,7 @@ For a user-focused overview and release links, see [README.md](README.md). This 
 - Python 3.8+
 - wxPython 4.x
 - On Linux, GTK+ 3 development libraries are required for wxPython
+- PyInstaller if you need to produce standalone packages locally
 
 Creating a virtual environment is recommended to avoid dependency conflicts:
 
@@ -26,7 +27,19 @@ Install the project dependencies:
 pip3 install -r requirements.txt
 ```
 
-> **Note on Linux**: You may need to install GTK+ 3 development libraries before installing `wxPython`. See the Linux setup notes in [README.md](README.md#platform-specific-installation).
+> **Note on Linux**: You may need to install GTK+ 3 development libraries before installing `wxPython`.
+
+Linux system packages commonly required for wxPython:
+
+```bash
+sudo apt-get install build-essential gettext python3-dev libgtk-3-dev
+```
+
+If you need to build standalone packages locally, install PyInstaller as well:
+
+```bash
+pip3 install PyInstaller
+```
 
 ### Running the App Locally
 
@@ -76,8 +89,47 @@ Exercise any workflows affected by your change (e.g. import, export, update, del
 ## Packaging and CI
 
 Standalone packages for Windows, macOS, and Linux are built automatically via GitHub Actions.
-See the [Compiling/Packaging Standalone](README.md#compilingpackaging-standalone) section of README.md for details.
 You do not need to build packages locally to contribute code changes.
+
+### Automated Builds (GitHub Actions)
+
+The CI workflow automatically compiles all three standalone versions (Windows, macOS, Linux) for supported pull requests and pushes to the active development branch. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
+
+### Manual Compilation
+
+For local testing or manual builds, compile each standalone version on its matching operating system: Windows on Windows, Linux on Linux, and macOS on macOS.
+
+#### Compiling a Windows Standalone Package
+
+Use a Windows computer with Python 3.8+, wxPython, and PyInstaller installed.
+
+Navigate to the `package-win` directory and run `package.bat`. It creates `ebi.zip` containing the packaged application.
+`package.bat` does the following automatically:
+1. Validates Python and PyInstaller dependencies.
+2. Removes any previous packages from the working folder.
+3. Invokes `setup.py`, which uses PyInstaller to generate a standalone package in a folder called `dist`. The `dist` folder contains `ebi.exe`, which is the standalone Windows EBI executable.
+4. Renames the `dist` folder to `ebi`.
+5. Copies the source files into the `ebi\source` folder for reference.
+6. Invokes `package.py`, which zips the `ebi` folder into `ebi.zip`.
+
+#### Compiling a Linux Standalone Package
+
+Use a Linux computer with Python 3.8+, wxPython, and PyInstaller installed.
+
+Navigate to the `package-linux` directory and run `bash package.sh`. It creates `ebi.zip` containing the packaged application compatible with Linux environments.
+`package.sh` performs the same operations automatically as its Windows counterpart (`package.bat`), yielding an ELF executable (`ebi`) inside `ebi/ebi` rather than an `.exe`, and finally zipping it into `ebi.zip`.
+
+#### Compiling a macOS Standalone Package
+
+Use a Macintosh computer with Python 3.8+, wxPython 4.2+, and PyInstaller installed.
+
+Navigate to the `package-mac` directory and run `bash ebi-package.command` (or make it executable and run it). It creates `ebi.dmg` in the `dist` subfolder.
+`ebi-package.command` does the following:
+1. Validates dependencies and checks for PyInstaller.
+2. Removes previous builds from the `build` and `dist` directories.
+3. Invokes `setup.py`, which uses PyInstaller to generate a macOS application bundle (`ebi.app`) inside the `dist` folder.
+4. Copies the launcher script wrapper into the `ebi.app` package.
+5. Creates a disk image `ebi.dmg` in the `dist` folder from `ebi.app` using `hdiutil`.
 
 ## Reporting Issues
 
