@@ -1,5 +1,5 @@
 # EBI (openEQUELLA Bulk Importer)
-> 🛠 **Status:** This branch reflects the latest development. For the most recent stable executable, please see [Latest Releases](https://github.com/openequella/openEQUELLA-ebi/releases/latest).
+> 🛠 **Status:** This repository reflects the latest development. For the most recent stable executable, please see [Latest Releases](https://github.com/openequella/openEQUELLA-ebi/releases/latest).
 
 The EBI is a popular tool for importing content into openEQUELLA. It can also be used for updating, deleting and exporting content.
 

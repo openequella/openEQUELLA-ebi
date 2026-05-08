@@ -23,7 +23,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 Install the project dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
 > **Note on Linux**: You may need to install GTK+ 3 development libraries before installing `wxPython`. See the Linux setup notes in [README.md](README.md#platform-specific-installation).
