@@ -1,4 +1,6 @@
 # EBI (openEQUELLA Bulk Importer)
+> 🛠 **Status:** This branch reflects the latest development. For the most recent stable executable, please see [Latest Releases](https://github.com/openequella/openEQUELLA-ebi/releases/latest).
+
 The EBI is a popular tool for importing content into openEQUELLA. It can also be used for updating, deleting and exporting content.
 
 The EBI is written in Python and compiled to standalone versions (i.e. they will run on a computer without Python) for Windows, macOS, and Linux. The EBI can also be run from the source files on systems with Python (and wxPython, see Dependencies) installed.
@@ -10,8 +12,6 @@ The EBI requires both Python 3.x and the GUI framework wxPython 4.x.
 The latest releases of the standalone packages for Windows, macOS, and Linux do not require Python nor wxPython to be installed.
 To run the EBI from source files, both Python 3.x and wxPython 4.x must be installed.
 On Linux, wxPython requires GTK+ 3 libraries to be present.
-
-To make modifications to and test EBI, Python 3.x and wxPython 4.x must be installed on the developer’s workstation. To compile the EBI as a standalone package then, as well as Python 3.x and wxPython 4.x, PyInstaller is required on the workstation.
 
 ### Quick Setup
 ```bash
@@ -64,47 +64,20 @@ pip3 install -r requirements.txt
 pip3 install PyInstaller
 ```
 
-The latest releases of the standalone packages for Windows, macOS, and Linux do not require installing Python or wxPython.
-To run the EBI from source files, both Python 3.8+ and wxPython must be installed.
+## Contributing
 
-To make modifications to and test EBI, Python 3.8+ and wxPython must be installed on the developer's workstation. To compile the EBI as a standalone package, PyInstaller must be installed on the workstation.
+Contributor and developer setup guidance now lives in [CONTRIBUTING.md](CONTRIBUTING.md), including:
 
-## Developer Guide
-
-For developers looking to contribute, extend, or maintain the codebase, here's how to set up your environment:
-
-1. **Prerequisites**
-   Ensure you have Python 3.8+ installed. Creating a virtual environment is highly recommended to avoid dependency conflicts.
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-2. **Dependencies**
-   Install the necessary requirements. For GUI work, you need `wxPython>=4.2.0`.
-   ```bash
-   pip install -r requirements.txt
-   ```
-   > **Note on Linux**: You may need to install GTK+ 3 development libraries before installing `wxPython`. See the Linux Platform-Specific Installation section above.
-
-3. **Running the App Locally**
-   To launch the main EBI GUI application during development from the root directory:
-   ```bash
-   python source/ebi.py
-   ```
-
-4. **Code Structure Overview**
-   - `source/ebi.py`: The main entry point script that launches the GUI.
-   - `source/MainFrame.py`: Contains the core wxPython GUI definitions and logic to connect UI steps.
-   - `source/Engine.py`: Handles CSV processing state and data orchestration.
-   - `source/RowProcessor.py`: Isolated logic mapping rows to EQUELLA Items using a `RowContext`.
-   - `source/equellaclient41.py`: The core SOAP API client to communicate with an EQUELLA instance.
+- local development environment setup
+- running EBI from source
+- contribution workflow and pull request guidance
+- testing expectations and code structure notes
 
 ## Compiling/Packaging Standalone
 EBI can be compiled as a standalone package to remove the need for end users to install Python. 
 
 ### Automated Builds (GitHub Actions)
-The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for every push to `master`, `develop`, or `release/**` branches. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
+The project includes a GitHub Actions CI workflow that automatically compiles all three standalone versions (Windows, Mac, Linux) for supported pull requests and pushes to the active development branch. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
 
 > **Note for macOS Users**: When downloading the `ebi.dmg` artifact from GitHub Actions or GitHub Releases, macOS Gatekeeper may flag the application as "damaged" because it was downloaded from the internet and lacks an Apple Developer certificate. To run the application, you must remove the quarantine attribute. Open your Terminal and run:
 > ```bash

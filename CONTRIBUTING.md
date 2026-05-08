@@ -5,8 +5,44 @@ Contributions of all kinds are welcome — bug fixes, new features, documentatio
 
 ## Development Setup
 
-Follow the [Developer Guide in README.md](README.md#developer-guide) to set up your local environment.
-That guide covers installing Python 3.8+, wxPython 4.x, creating a virtual environment, and running EBI from source.
+For a user-focused overview and release links, see [README.md](README.md). This guide covers contributor and maintainer workflows.
+
+### Prerequisites
+
+- Python 3.8+
+- wxPython 4.x
+- On Linux, GTK+ 3 development libraries are required for wxPython
+
+Creating a virtual environment is recommended to avoid dependency conflicts:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+Install the project dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+> **Note on Linux**: You may need to install GTK+ 3 development libraries before installing `wxPython`. See the Linux setup notes in [README.md](README.md#platform-specific-installation).
+
+### Running the App Locally
+
+From the repository root, launch the GUI application with:
+
+```bash
+python3 source/ebi.py
+```
+
+### Code Structure Overview
+
+- `source/ebi.py`: Main entry point script that launches the GUI.
+- `source/MainFrame.py`: Core wxPython GUI definitions and flow wiring.
+- `source/Engine.py`: CSV processing state and data orchestration.
+- `source/RowProcessor.py`: Row-to-item processing logic using a `RowContext`.
+- `source/equellaclient41.py`: SOAP API client for communicating with an openEQUELLA instance.
 
 ## Contribution Workflow
 
@@ -15,9 +51,9 @@ That guide covers installing Python 3.8+, wxPython 4.x, creating a virtual envir
    ```bash
    git checkout -b my-feature-or-fix
    ```
-3. **Make your changes** and verify they work by running EBI from source (see [Running the App Locally](README.md#developer-guide)).
+3. **Make your changes** and verify they work by running EBI from source (see [Running the App Locally](#running-the-app-locally)).
 4. **Commit** with a clear, descriptive message.
-5. **Push** your branch to your fork and open a **Pull Request** against the `develop` branch of this repository.
+5. **Push** your branch to your fork and open a **Pull Request** against the repository's current default branch, which reflects the latest development state.
 6. Respond to any review feedback.
 
 ## Code Conventions
