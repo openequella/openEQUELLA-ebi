@@ -5,8 +5,57 @@ Contributions of all kinds are welcome — bug fixes, new features, documentatio
 
 ## Development Setup
 
-Follow the [Developer Guide in README.md](README.md#developer-guide) to set up your local environment.
-That guide covers installing Python 3.8+, wxPython 4.x, creating a virtual environment, and running EBI from source.
+For a user-focused overview and release links, see [README.md](README.md). This guide covers contributor and maintainer workflows.
+
+### Prerequisites
+
+- Python 3.8+
+- wxPython 4.x
+- On Linux, GTK+ 3 development libraries are required for wxPython
+- PyInstaller if you need to produce standalone packages locally
+
+Creating a virtual environment is recommended to avoid dependency conflicts:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+Install the project dependencies:
+
+```bash
+pip3 install -r requirements.txt
+```
+
+> **Note on Linux**: You may need to install GTK+ 3 development libraries before installing `wxPython`.
+
+Linux system packages commonly required for wxPython:
+
+```bash
+sudo apt-get install build-essential gettext python3-dev libgtk-3-dev
+```
+
+If you need to build standalone packages locally, install PyInstaller as well:
+
+```bash
+pip3 install PyInstaller
+```
+
+### Running the App Locally
+
+From the repository root, launch the GUI application with:
+
+```bash
+python3 source/ebi.py
+```
+
+### Code Structure Overview
+
+- `source/ebi.py`: Main entry point script that launches the GUI.
+- `source/MainFrame.py`: Core wxPython GUI definitions and flow wiring.
+- `source/Engine.py`: CSV processing state and data orchestration.
+- `source/RowProcessor.py`: Row-to-item processing logic using a `RowContext`.
+- `source/equellaclient41.py`: SOAP API client for communicating with an openEQUELLA instance.
 
 ## Contribution Workflow
 
@@ -15,9 +64,9 @@ That guide covers installing Python 3.8+, wxPython 4.x, creating a virtual envir
    ```bash
    git checkout -b my-feature-or-fix
    ```
-3. **Make your changes** and verify they work by running EBI from source (see [Running the App Locally](README.md#developer-guide)).
+3. **Make your changes** and verify they work by running EBI from source (see [Running the App Locally](#running-the-app-locally)).
 4. **Commit** with a clear, descriptive message.
-5. **Push** your branch to your fork and open a **Pull Request** against the `develop` branch of this repository.
+5. **Push** your branch to your fork and open a **Pull Request** against `master`.
 6. Respond to any review feedback.
 
 ## Code Conventions
@@ -40,8 +89,47 @@ Exercise any workflows affected by your change (e.g. import, export, update, del
 ## Packaging and CI
 
 Standalone packages for Windows, macOS, and Linux are built automatically via GitHub Actions.
-See the [Compiling/Packaging Standalone](README.md#compilingpackaging-standalone) section of README.md for details.
 You do not need to build packages locally to contribute code changes.
+
+### Automated Builds (GitHub Actions)
+
+The CI workflow automatically compiles all three standalone versions (Windows, macOS, Linux) for supported pull requests and pushes to `master`. The resulting packages are uploaded as GitHub Actions build artifacts for those workflow runs. On tag pushes, the workflow also publishes these packages as release assets in GitHub Releases.
+
+### Manual Compilation
+
+For local testing or manual builds, compile each standalone version on its matching operating system: Windows on Windows, Linux on Linux, and macOS on macOS.
+
+#### Compiling a Windows Standalone Package
+
+Use a Windows computer with Python 3.8+, wxPython, and PyInstaller installed.
+
+Navigate to the `package-win` directory and run `package.bat`. It creates `ebi.zip` containing the packaged application.
+`package.bat` does the following automatically:
+1. Validates Python and PyInstaller dependencies.
+2. Removes any previous packages from the working folder.
+3. Invokes `setup.py`, which uses PyInstaller to generate a standalone package in a folder called `dist`. The `dist` folder contains `ebi.exe`, which is the standalone Windows EBI executable.
+4. Renames the `dist` folder to `ebi`.
+5. Copies the source files into the `ebi\source` folder for reference.
+6. Invokes `package.py`, which zips the `ebi` folder into `ebi.zip`.
+
+#### Compiling a Linux Standalone Package
+
+Use a Linux computer with Python 3.8+, wxPython, and PyInstaller installed.
+
+Navigate to the `package-linux` directory and run `bash package.sh`. It creates `ebi.zip` containing the packaged application compatible with Linux environments.
+`package.sh` performs the same operations automatically as its Windows counterpart (`package.bat`), yielding an ELF executable (`ebi`) inside `ebi/ebi` rather than an `.exe`, and finally zipping it into `ebi.zip`.
+
+#### Compiling a macOS Standalone Package
+
+Use a Macintosh computer with Python 3.8+, wxPython 4.2+, and PyInstaller installed.
+
+Navigate to the `package-mac` directory and run `bash ebi-package.command` (or make it executable and run it). It creates `ebi.dmg` in the `dist` subfolder.
+`ebi-package.command` does the following:
+1. Validates dependencies and checks for PyInstaller.
+2. Removes previous builds from the `build` and `dist` directories.
+3. Invokes `setup.py`, which uses PyInstaller to generate a macOS application bundle (`ebi.app`) inside the `dist` folder.
+4. Copies the launcher script wrapper into the `ebi.app` package.
+5. Creates a disk image `ebi.dmg` in the `dist` folder from `ebi.app` using `hdiutil`.
 
 ## Reporting Issues
 
