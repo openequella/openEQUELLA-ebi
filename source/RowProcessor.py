@@ -1120,7 +1120,7 @@ class RowProcessor:
 
             xmlFilename = os.path.join(xmlFolderName, "ebi-%06d.xml" % row_counter)
 
-            with open(xmlFilename, "w") as fp:
+            with open(xmlFilename, "w", encoding=self.encoding) as fp:
                 fp.write(item.newDom.toprettyxml("    ", "\n", self.encoding).decode(self.encoding))
 
         # cancel edit (test only)
