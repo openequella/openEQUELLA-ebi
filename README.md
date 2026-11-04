@@ -1,5 +1,7 @@
 # EBI (openEQUELLA Bulk Importer)
-> 🛠 **Status:** This repository reflects the latest development. For the most recent stable executable, please see [Latest Releases](https://github.com/openequella/openEQUELLA-ebi/releases/latest).
+> ⚠️ **Deprecated and archived:** The EBI is no longer maintained or supported. It relies on openEQUELLA's SOAP API, and SOAP support has been removed from openEQUELLA, so the EBI will not work with current openEQUELLA versions. This repository is archived and kept read-only for reference.
+>
+> If you need a bulk import tool for openEQUELLA, please contact [Edalex](https://www.edalex.com) at [info@edalex.com](mailto:info@edalex.com) for more information.
 
 The EBI is a popular tool for importing content into openEQUELLA. It can also be used for updating, deleting and exporting content.
 
